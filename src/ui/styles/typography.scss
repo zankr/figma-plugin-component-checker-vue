@@ -1,0 +1,120 @@
+@use './variables' as *;
+
+// Global body style
+body {
+  font-family: $font-family-default;
+  color: $text-dark;
+  background-color: #fff;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+// Reset default colors for common tags
+h1, h2, h3, h4, h5, h6,
+p, span, a, li, td, th {
+  color: $text-dark;
+}
+
+// Headings
+.h1 {
+  font-size: 35px;
+  font-weight: bold;
+  line-height: 40px;
+}
+
+.h2 {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 32px;
+}
+
+.h3 {
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 28px;
+}
+
+.h4 {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.h5 {
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 20px;
+}
+
+.h6 {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.h7 {
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 16px;
+}
+
+.h8 {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+// Body text
+.body {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.body-small {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+// Formatting
+.bold {
+  font-weight: bold;
+}
+
+.italic {
+  font-style: italic;
+  font-weight: 500;
+}
+
+.paragraph-indent {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 24px;
+  text-indent: 16px;
+}
+
+// Link
+.link {
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+// Text color utilities
+.text-dark {
+  color: $text-dark !important;
+}
+
+.text-light-dark {
+  color: $text-light-dark !important;
+}
+
+.text-light {
+  color: $text-light !important;
+}
+
+.text-white {
+  color: $text-white !important;
+}

@@ -6,7 +6,7 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       input: {
-        index: path.resolve(__dirname, 'src/code/code.ts'),
+        index: path.resolve(__dirname, 'src/code/code.js'),
       },
       output: {
 				manualChunks: undefined,

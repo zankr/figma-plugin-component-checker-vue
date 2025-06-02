@@ -13,6 +13,7 @@
   "license": "",
   "dependencies": {
     "@figma/plugin-typings": "^1.100.2",
+    "@tensorflow/tfjs": "^4.22.0",
     "typescript": "^5.6.2",
     "vue": "^3.5.10"
   },
