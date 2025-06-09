@@ -54,96 +54,52 @@
         </div>
       </div>
 
-      <div class="container-instance">
-          <div v-for="(item, idx) in images" :key="idx" class="container">
-          <!-- Left Panel -->
-            <div class="panel left">
-              <h7 class="bold"> {{ item.name }} (ID: {{ item.id }})</h7>
-              
-              <div class="img-container">
-                  <img
-                    :src="item.blobUrl"
-                    alt="Invalid Instance"
-                    class="responsive-img"
-                  />
-              </div>
-              <!-- <img :src="item.blobUrl" alt="Invalid Instance"
-              style="max-width: 100%; border: 1px solid #ccc; display: block; margin-bottom: 8px;" />
-               -->
-              
-
-              <!-- Browse File -->
-              <!-- <button class="btn browse" @click="browseFile">Browse File</button> -->
-
-              <!-- Go to Component -->
-
-              <Button block="true" variant="primary" @click="goToComponent(item.predictedLabel, item.id)"> Go to Component </Button>
-            
+      <!-- INVALID INSTANCES -->
+      <div v-for="(item, idx) in images" :key="idx"
+        style="margin-top: 24px; border: 1px solid #eee; padding: 12px; border-radius: 4px;">
+        <!-- Preview Gambar -->
+        <p><strong>Instance:</strong> {{ item.name }} (ID: {{ item.id }})</p>
+        <img :src="item.blobUrl" alt="Invalid Instance"
+          style="max-width: 100%; border: 1px solid #ccc; display: block; margin-bottom: 8px;" />
+  
+        <!-- Hasil Prediksi -->
+        <div v-if="item.predictedLabel">
+          <p>
+            <strong>Prediksi Label:</strong> {{ item.predictedLabel }} <br />
+            <strong>Confidence:</strong> {{ (item.confidence * 100) }}%
+          </p>
+          <!-- Tombol untuk navigasi ke master component yang sesuai -->
+          <div style="display: flex; flex-direction: row; gap: 12px; flex-wrap: wrap;">
+            <Button variant="secondary" @click="goToComponent(item.predictedLabel, item.id)" style="padding: 6px 12px; font-size: 13px;">
+            Go to Component
+          </Button>
+          <BButton variant="secondary" @click="fetchMasterPreview(item.predictedLabel, item.id)"
+            style="padding: 6px 12px; font-size: 13px; margin-left: 8px;">
+            Tampilkan Preview Master
+          </BButton>
+          </div>
+        </div>
+  
+        <!-- Spinner / loading kecil saat inferensi -->
+        <div v-else style="color: #999;">
+          🕒 Inferring...
+        </div>
+  
+        <!-- Jika user minta preview, tampilkan pilihan varian -->
+        <div v-if="item.variants && item.variants.length" style="margin-top: 12px;">
+          <p><strong>Pilih Varian Master untuk '{{ item.predictedLabel }}':</strong></p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <div v-for="(variant, j) in item.variants" :key="j"
+              style="border: 1px solid #ddd; padding: 8px; text-align: center; width: 100px;">
+              <img :src="variant.previewUrl" alt="Preview" style="width: 100%; margin-bottom: 4px;" />
+              <p style="font-size: 12px; margin: 4px 0;">{{ variant.name }}</p>
+              <BButton variant="secondary" @click="insertVariant(variant.key, item.id)" style="padding: 4px 8px; font-size: 12px;">
+                Pilih
+              </BButton>
             </div>
-
-          <!-- Right Panel -->
-            <div class="panel right">
-              <h7 class="bold">Summary</h7>
-
-              <div
-                class="summary-row"
-                v-if="item.predictedLabel"
-              >
-                <p class="body text-light-dark"> Instance : {{ item.name }}</p> 
-                <p class="body text-light-dark">Prediksi Label: {{ item.predictedLabel }} </p> 
-                <p class="body text-light-dark">Confidence: {{ (item.confidence * 100) }}% </p>
-              </div>
-
-              <hr class="divider" />
-
-              <h7 class="bold">Design System Component</h7>
-              <p class="body-small text-light-dark">
-                Silakan pilih komponen di bawah ini dari Design System yang sesuai untuk
-                menggantikan komponen yang tidak sesuai.
-              </p>
-
-              <div class="component-container">
-                <!-- <p class="instruction">
-                  Varian untuk “{{ item.predictedLabel }}”:
-                </p> -->
-
-                <!-- kalau sudah ada data variants -->
-                <div v-if="item.variants.length">
-                  <div
-                    v-for="(variant, j) in item.variants"
-                    :key="variant.key"
-                    class="component-item"
-                  >
-                    <img
-                      :src="variant.previewUrl"
-                      alt="Preview"
-                      class="thumb"
-                    />
-                    <p class="body bold" 
-                        style="display: block; width: 100%; margin: 0;">
-                        {{ variant.name }}
-                    </p>
-                    <Button
-                      variant="secondary"
-                      @click="insertVariant(variant.key, item.id)"
-                    >
-                      Insert
-                    </Button>
-                  </div>
-                </div>
-
-                <!-- loading state sambil menunggu variants -->
-                <div v-else>
-                  <p>Memuat varian…</p>
-                </div>
-              </div>
-
-            </div>
-      </div>  
-
+          </div>
+        </div>
       </div>
-
-      
 
       <!-- EMPTY STATE -->
       <div v-if="dataReceived && images.length === 0 && !noInvalid" style="margin-top: 16px;">
@@ -157,7 +113,7 @@
 import * as tf from "@tensorflow/tfjs";
 import Button from "../ui/components/Button.vue";
 import { toRaw, reactive } from "vue";
-
+// import Button from "../ui/components/Button.vue";
 
 
 export default {
@@ -237,10 +193,6 @@ export default {
       },
 
     async handleExportImage(msg) {
-      if (this.images.some(item => item.id === msg.id)) {
-          console.warn("Duplicate exportImage for id", msg.id);
-          return;
-        }
         // msg: { name, id, data: base64 PNG }
         const base64Data = msg.data;
         const blob = new Blob([Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], { type: "image/png" });
@@ -287,7 +239,6 @@ export default {
           // Update item di this.images
           newItem.predictedLabel = predictedLabel;
           newItem.confidence = confidence;
-          this.fetchMasterPreview(predictedLabel, newItem.id);
           console.log(`🔹 Prediksi untuk ${newItem.name}:`, predictedLabel, confidence);
         };
       },
@@ -349,9 +300,6 @@ export default {
         if (!msg) return;
   
         switch (msg.type) {
-          case "clearImages":
-            this.images = [];
-            return;  
           case "summary":
             this.handleSummary(msg);
             break;
@@ -375,202 +323,6 @@ export default {
 </script>
 
 <style scoped>
-
-.img-container {
-  /* opsional: kalau mau tinggi tetap */
-  display: flex;
-
-  justify-content: center;
-  align-items: center;
-  height: 205px;
-  background-color: #EEEEEE;
-  border-radius: 10px;
-  /* overflow: hidden; */
-}
-
-.responsive-img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  /* kalau mau selalu tampil di tengah (block + margin) */
-  display: block;
-}
-
-.container-instance {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  padding-top: 0px;
-}
-
-.container {
-  display: flex;
-  border: 1px solid #E8ECF5;
-  border-radius: 10px;
-  /* gap: 24px; */
-  background: #ffffff;
-  min-height: 325px;
-  /* padding: 24px; */
-}
-
-/* panel common */
-.panel {
-  background: #ffffff;
-  height: 325px;
-  flex: 1;
-  border: 1px solid #E8ECF5;
-  border-radius: 10px;
-  padding: 16px;
-  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); */
-}
-
-.left {
-  display: flex;
-  height: 325px;
-  width: 50%;
-  /* height: fit-content; */
-  flex-direction: column;
-  gap: 16px;
-  background-color: #F9F9F9;
-  border-radius: 0px;
-
-}
-
-.right {
-  display: flex;
-  width: 50%;
-  height: 325px;
-  flex-direction: column;
-  background-color: #ffffff;
-  gap: 8px;
-  border-radius: 0px;
-}
-
-.heading {
-  margin: 0 0 16px;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-
-
-/* Buttons */
-.btn {
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.browse {
-  background: #f3f4f6;
-  color: #111827;
-  padding: 10px 16px;
-  margin-bottom: 16px;
-}
-
-.go {
-  background: #16a34a;
-  color: #ffffff;
-  padding: 12px;
-  width: 100%;
-}
-
-/* Summary */
-.summary-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  justify-content: space-between;
-  width: 100%;
-  
-}
-
-.label {
-  color: #4b5563;
-}
-
-.value {
-  font-weight: 600;
-  color: #111827;
-}
-
-.divider {
-  border: none;
-  border-top: 1px solid #e5e7eb;
-  margin: 0px 0;
-}
-
-/* Design System */
-.subheading {
-  margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.instruction {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.component-container {
-  flex: 1;
-  min-height: 72px;
-  overflow-y: auto;
-
-  /* Firefox */
-  scrollbar-width: none;
-  /* IE 10+ */
-  -ms-overflow-style: none;
-}
-
-/* Chrome, Safari, Opera */
-.component-container::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.component-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  height: 72px;
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  padding: 16px;
-  margin-bottom: 8px;
-  align-items: center;
-}
-
-.component-item:last-child {
-  margin-bottom: 0;
-}
-
-.thumb {
-  width: 52px;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  /* kalau mau selalu tampil di tengah (block + margin) */
-  display: block;
-}
-
-.name {
-  flex: 1;
-  font-weight: 600;
-  color: #111827;
-}
-
-.insert {
-  background: #f3f4f6;
-  color: #111827;
-  padding: 8px 12px;
-}
-
-
 :root {
   --clr-primary: #02ae5b;
   --clr-secondary: #ffffff;

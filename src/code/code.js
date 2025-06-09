@@ -101,8 +101,6 @@ function isPlainTextOnly(node) {
   return checkChildren(node.children);
 }
 
-
-
 async function exportNodeAsPng(node) {
   try {
     // Hitung ukuran node
@@ -133,12 +131,6 @@ async function exportNodeAsPng(node) {
     figma.notify(`Failed to export ${node.name}.`);
   }
 }
-
-// console.log(`Checking node: ${node.name}`);
-// for (const child of node.children) {
-//   console.log(`Child node: ${child.name} - Type: ${child.type}`);
-// }
-
 
 // Fungsi untuk mengirim data gambar ke UI
 function sendToUi(name, id, imageData, predictedLabel = "", confidence = "") {
@@ -302,39 +294,37 @@ figma.ui.onmessage = async (msg) => {
   }
 
   if (msg.type === "user-selected-variant") {
+    const { key, originalId } = msg;
+
+    // Cek dulu apakah user sudah memilih frame
+    const selection = figma.currentPage.selection;
+    const targetFrame = (selection.length === 1 && selection[0].type === "FRAME")
+      ? selection[0]
+      : null;
+    if (!targetFrame) {
+      figma.notify("Please select one frame");
+      return;
+    }
+
     try {
-      const { key, originalId } = msg;
+      // Import component master & buat instance
       const masterComponent = await figma.importComponentByKeyAsync(key);
       const instance = masterComponent.createInstance();
 
-      const selection = figma.currentPage.selection;
-      let targetFrame = null;
+      // Append ke frame terpilih
+      targetFrame.appendChild(instance);
+      // Posisikan di tengah
+      instance.x = targetFrame.width / 2 - instance.width / 2;
+      instance.y = targetFrame.height / 2 - instance.height / 2;
 
-      if (selection.length === 1 && selection[0].type === "FRAME") {
-        targetFrame = selection[0];
-      }
+      // Pilih dan scroll ke instance
+      figma.currentPage.selection = [instance];
+      figma.viewport.scrollAndZoomIntoView([instance]);
 
-      if (targetFrame) {
-        targetFrame.appendChild(instance);
-        instance.x = targetFrame.width / 2 - instance.width / 2;
-        instance.y = targetFrame.height / 2 - instance.height / 2;
-        figma.currentPage.selection = [instance];
-        figma.viewport.scrollAndZoomIntoView([instance]);
-        figma.notify("Component inserted into selected frame and ready to drag!");
-      } else {
-        figma.currentPage.appendChild(instance);
-        instance.x = 100;
-        instance.y = 100;
-        figma.currentPage.selection = [instance];
-        figma.viewport.scrollAndZoomIntoView([instance]);
-        figma.notify("Component inserted into page and ready to drag!");
-      }
+      figma.notify("Component inserted into selected frame and ready to drag!");
     } catch (error) {
       console.error("Error inserting selected variant:", error);
       figma.notify("Error inserting component.");
     }
   }
 };
-
-
-// test
