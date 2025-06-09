@@ -1,66 +1,82 @@
-<!-- BaseButton.vue -->
 <template>
-  <button :class="buttonClasses">
+  <button
+    class="custom-button"
+    :class="[
+      variantClass,
+      'body',
+      textColorClass,
+      { 'custom-button--block': block }
+    ]"
+    @click="$emit('click')"
+    :disabled="disabled"
+  >
     <slot>Button</slot>
   </button>
 </template>
 
-<script setup>
-import { computed } from 'vue'
-
-// Define props with validation
-const props = defineProps({
-  /** 
-   * Which color variant to use. 
-   * Accepts "primary", "secondary" or "tertiary".
-   */
-  variant: {
-    type: String,
-    default: 'primary',
-    validator: v => ['primary', 'secondary', 'tertiary'].includes(v)
+<script>
+export default {
+  name: 'Button',
+  props: {
+    variant: {
+      type: String,
+      default: 'primary',
+      validator: val => ['primary', 'secondary-light'].includes(val)
+    },
+    disabled: {
+      type: Boolean,
+      default: false
+    },
+    block: {
+      type: Boolean,
+      default: false // true = fill container, false = hug content
+    }
+  },
+  computed: {
+    variantClass() {
+      return `custom-button--${this.variant}`;
+    },
+    textColorClass() {
+      return this.variant === 'primary' ? 'text-white' : 'text-dark';
+    }
   }
-})
-
-// Compute the CSS classes based on variant
-const buttonClasses = computed(() => ['btn', `btn--${props.variant}`])
+};
 </script>
 
 <style scoped>
-/* Base styles shared by all variants */
-.btn {
+.custom-button {
   border: none;
-  padding: 0.5em 1em;
-  border-radius: 4px;
-  font-size: 1rem;
+  padding: 12px 16px;
+  border-radius: 5px;
+  font-family: inherit;
   cursor: pointer;
-  transition: background-color .2s ease, color .2s ease;
+  
+  transition: background-color 0.2s ease-in-out;
+  width: fit-content; /* hug content secara default */
 }
 
-/* Primary (green) */
-.btn--primary {
-  background-color: #28a745;
-  color: #ffffff;
-}
-.btn--primary:hover {
-  background-color: #218838;
+.custom-button--block {
+  width: 100%; /* fill container jika block = true */
 }
 
-/* Secondary (blue) */
-.btn--secondary {
-  background-color: #007bff;
-  color: #ffffff;
+/* VARIANT STYLES */
+.custom-button--primary {
+  background-color: #08A94C;
 }
-.btn--secondary:hover {
-  background-color: #0069d9;
+.custom-button--primary:hover {
+  background-color: #079344;
+}
+.custom-button--secondary-light {
+  background-color: #f5f8fa;
+  border: 1px solid #e8ecf5;
+}
+.custom-button--secondary-light:hover {
+  background-color: #e4eaf0;
 }
 
-/* Tertiary (light gray background, dark text, outlined) */
-.btn--tertiary {
-  background-color: #f8f9fa;
-  color: #212529;
-  border: 1px solid #ced4da;
-}
-.btn--tertiary:hover {
-  background-color: #e2e6ea;
+/* DISABLED */
+.custom-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

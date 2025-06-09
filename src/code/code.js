@@ -10,7 +10,6 @@ async function fetchMasterComponents() {
   const FIGMA_FILE_KEY = "HIHSBFb6tatYWQYl2LudlV";
   const url = `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`;
 
-  
   if (masterComponents.length === 0) {
     try {
       const response = await fetch(url, {
