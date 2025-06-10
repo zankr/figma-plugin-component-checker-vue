@@ -1,13 +1,38 @@
 // Menampilkan UI dengan ukuran 800x600
 figma.showUI(__html__, { width: 800, height: 600 });
 
+// 1) Variabel global untuk config
+let FIGMA_FILE_KEY = '';
+let CNN_MODEL_URL  = '';
+const FIGMA_ACCESS_TOKEN = "figd_dqS-9HS38jaKupAx9-t-LC4j2znS9a0m7icKdX_P";
+
+// 2) Load config dari figma.clientStorage
+async function initConfig() {
+  const cfg = await figma.clientStorage.getAsync('plugin-config');
+  if (cfg) {
+    FIGMA_FILE_KEY = cfg.figmaFileKey || '';
+    CNN_MODEL_URL  = cfg.cnnModelUrl   || '';
+  }
+}
+
+// 3) Tampilkan UI setelah load config, kirim ke UI untuk pre-fill
+(async () => {
+  await initConfig();
+  figma.showUI(__html__, { width: 800, height: 600 });
+  figma.ui.postMessage({
+    type: 'load-config',
+    figmaFileKey: FIGMA_FILE_KEY,
+    cnnModelUrl:   CNN_MODEL_URL
+  });
+})();
+
 // Variabel global untuk menyimpan data master component (detail: key dan nama)
 let masterComponents = [];
 
 // Fungsi untuk mengambil dan menyimpan data master component dari Figma
 async function fetchMasterComponents() {
   const FIGMA_ACCESS_TOKEN = "figd_dqS-9HS38jaKupAx9-t-LC4j2znS9a0m7icKdX_P";
-  const FIGMA_FILE_KEY = "HIHSBFb6tatYWQYl2LudlV";
+  // const FIGMA_FILE_KEY = "HIHSBFb6tatYWQYl2LudlV";
   const url = `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`;
 
   if (masterComponents.length === 0) {
@@ -226,12 +251,23 @@ async function generateMasterPreviews(predictedLabel) {
 
 // Handler untuk pesan dari UI
 figma.ui.onmessage = async (msg) => {
+
+  if (msg.type === 'save-config') {
+    FIGMA_FILE_KEY = msg.figmaFileKey;
+    CNN_MODEL_URL  = msg.cnnModelUrl;
+    await figma.clientStorage.setAsync('plugin-config', {
+      figmaFileKey: FIGMA_FILE_KEY,
+      cnnModelUrl:   CNN_MODEL_URL
+    });
+    return;
+  }
+
   if (msg.type === "check-components") {
     const selection = figma.currentPage.selection;
     if (selection.length !== 1 || selection[0].type !== "FRAME") {
       figma.notify("Please select one frame.");
       return;
-    }
+    } 
     const frame = selection[0];
     await fetchMasterComponents();
     if (masterComponents.length === 0) {
