@@ -1,110 +1,64 @@
 <template>
-    <div class="plugin-wrapper">
+  <div class="plugin-wrapper">
+    <!-- … SIDEBAR & HEADER tetap sama … -->
 
-        <!-- SIDEBAR KIRI -->
-        <aside class="sidebar">
-        <ul class="sidebar-icons">
-            <li :class="{ 'is-active': $route.path === '/checker' }" @click="goToChecker()">
-            <img src="../ui/assets/icon-checker-default.png" alt="Checker" />
-            </li>
-            <li :class="{ 'is-active': $route.path === '/component' }" @click="goToComponentPage()">
-            <img src="../ui/assets/icon-component-active.png" alt="Component" />
-            </li>
-            <li :class="{ 'is-active': $route.path === '/help' }" @click="goToHelp()">
-            <img src="../ui/assets/icon-help-default.png" alt="Help" />
-            </li>
-        </ul>
-        <div class="sidebar-bottom">
-            <button :class="{ 'is-active': $route.path === '/settings' }" @click="goToSettings()">
-            <img src="../ui/assets/icon-settings-default.png" alt="Settings" />
-            </button>
-        </div>
-        </aside>
-
-
-        <div class="plugin-container">
-          <div class="plugin-header">
-            <div class="header-text">
-              <h4 class="h4 bold">Design System Components</h4>
-              <p class="h7 text-light-dark">Showcases all components available in the design system</p>
-              <!-- <Button :disabled="!isModelReady" variant="primary" @click="onClickCheck">
-                Check Components
-              </Button> -->
-              <div class="search-box">
-                <!-- <span class="body-small text-light" style="width: 215px;">Search component</span> -->
-                <input
-                  v-model="searchTerm"
-                  @input="onSearch"
-                  type="text"
-                  placeholder="Search component"
-                  class="body-small"
-                />
-              </div>
-            </div>
-            <div class="header-illustration">
-              <img src="../ui/assets/img-background-ds.png" alt="Illustration" />
-            </div>
-          </div>
-
-          <div
-            ref="container"
-            class="component-container"
-            @scroll="onScroll"
-          >
-            <!-- Spinner loading pertama kali -->
-            <div v-if="loading && !isLoadingMore" class="loading-spinner"></div>
-
-            <!-- Card komponen -->
-            <div
-              v-for="c in filteredComponents"
-              :key="c.key"
-              class="component-card"
-              
-            >
-              <!-- Thumbnail -->
-            
-              <!-- Nama -->
-              <p class="h7">{{ c.name.replace(/^Component\//, '') }}</p>
-            
-              <div class="img-container">
-                <img
-                v-if="c.thumbnail_url"
-                :src="c.thumbnail_url"
-                :alt="c.name"
-                class="component-thumbnail"
-              />
-              </div>
-
-              <Button block="true" variant="primary" @click="insertComponent(c.key)"
-              >Insert Component
-              </Button>
-              
-            </div>
-
-            <!-- Spinner load-more di bawah -->
-            <div v-if="isLoadingMore" class="loading-spinner"></div>
-
-            <!-- Bila tidak ada hasil sama sekali -->
-            <p v-if="!loading && !filteredComponents.length" class="no-results">
-              No components found.
-            </p>
-          </div>
-
-        </div>
-
-
+    <!-- Search bar (opsional, kalau kamu mau) -->
+    <div class="search-box">
+      <span class="material-icons">search</span>
+      <input
+        v-model="searchTerm"
+        @input="onSearch"
+        type="text"
+        placeholder="Search components..."
+        class="search-input"
+      />
     </div>
 
+    <!-- Grid container dengan infinite scroll -->
+    <div
+      ref="container"
+      class="component-container"
+      @scroll="onScroll"
+    >
+      <!-- Spinner loading pertama kali -->
+      <div v-if="loading && !isLoadingMore" class="loading-spinner"></div>
 
+      <!-- Card komponen -->
+      <div
+        v-for="c in filteredComponents"
+        :key="c.key"
+        class="component-card"
+        draggable="true"
+        @dragstart="onDragStart"
+        @dragend="onDragEnd(c.key)"
+      >
+        <!-- Thumbnail -->
+        <img
+          v-if="c.thumbnail_url"
+          :src="c.thumbnail_url"
+          :alt="c.name"
+          class="component-thumbnail"
+        />
+        <div v-else class="thumbnail-placeholder">…</div>
 
+        <!-- Nama -->
+        <p class="component-name">{{ c.name.replace(/^Component\//, '') }}</p>
+      </div>
+
+      <!-- Spinner load-more di bawah -->
+      <div v-if="isLoadingMore" class="loading-spinner"></div>
+
+      <!-- Bila tidak ada hasil sama sekali -->
+      <p v-if="!loading && !filteredComponents.length" class="no-results">
+        No components found.
+      </p>
+    </div>
+  </div>
 </template>
 
 <script>
-import Button from '../ui/components/Button.vue'
-
 export default {
   name: 'ComponentPage',
-  components: { Button },
   data() {
     return {
       components: [],        // semua batch yang sudah di-fetch
@@ -201,14 +155,24 @@ export default {
       // nothing extra—filteredComponents akan otomatis update
     },
 
-    insertComponent(key) {
-    parent.postMessage({
-      pluginMessage: {
-        type: 'insert-component',
-        key: key
+    onDragStart(e) {
+      // sembunyikan default drag image
+      e.dataTransfer.setDragImage(new Image(), 0, 0)
+    },
+
+    onDragEnd(key) {
+      return e => {
+        // simpan posisi kursor untuk insert
+        this.cursorPos = { x: e.clientX, y: e.clientY }
+        parent.postMessage({
+          pluginMessage: {
+            type: 'insert-component',
+            key,
+            cursorPosition: this.cursorPos
+          }
+        }, '*')
       }
-    }, '*')
-  }
+    }
   }
 }
 </script>
@@ -307,36 +271,20 @@ export default {
   height: calc(100vh - 120px);
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 16px;
   padding: 16px;
 }
 .component-card {
   display: flex;
-  width: 221px;
-  height: 272px;
   flex-direction: column;
-  gap: 16px;
   align-items: center;
   padding: 16px;
   border: 1px solid #E8ECF5;
-  border-radius: 10px;
+  border-radius: 20px;
+  cursor: pointer;
   background: #fff;
 }
-
-.img-container {
-  
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 189px;
-  height: 152px;
-  background-color: #F5F8FA;
-  border-radius: 10px;
-  padding: 8px;
-  /* overflow: hidden; */
-}
-
 .component-thumbnail {
   width: 100px;
   height: 100px;
@@ -372,15 +320,13 @@ export default {
   color: #999;
 }
 .search-box {
-  height: 40px;
-  width: 215px;
   display: flex;
   align-items: center;
   padding: 12px;
-  border: 1px solid #E8ECF5;
+  border: 1px solid #e8ecf5;
   border-radius: 5px;
   background: #fff;
-  
+  margin: 16px;
 }
 .search-box input {
   border: none;

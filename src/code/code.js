@@ -6,6 +6,11 @@ let FIGMA_FILE_KEY = '';
 let CNN_MODEL_URL  = '';
 const FIGMA_ACCESS_TOKEN = "figd_dqS-9HS38jaKupAx9-t-LC4j2znS9a0m7icKdX_P";
 
+// 1.a) Lazy‐load state untuk Component Page
+let metaComponents   = [];     // semua metadata komponen
+let isFullyLoaded    = false;  // flag jika semua sudah diambil
+const batchSize      = 20;     // ukuran tiap batch
+
 // 2) Load config dari figma.clientStorage
 async function initConfig() {
   const cfg = await figma.clientStorage.getAsync('plugin-config');
@@ -18,7 +23,7 @@ async function initConfig() {
 // 3) Tampilkan UI setelah load config, kirim ke UI untuk pre-fill
 (async () => {
   await initConfig();
-  figma.showUI(__html__, { width: 800, height: 600 });
+  // figma.showUI(__html__, { width: 800, height: 600 });
   figma.ui.postMessage({
     type: 'load-config',
     figmaFileKey: FIGMA_FILE_KEY,
@@ -26,8 +31,44 @@ async function initConfig() {
   });
 })();
 
+async function fetchComponentsBatch(start = 0) {
+  // 1) Fetch metadata sekali saja
+  if (metaComponents.length === 0) {
+    const res = await fetch(
+      `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`,
+      { headers: { 'X-Figma-Token': FIGMA_ACCESS_TOKEN } }
+    );
+    if (!res.ok) throw new Error('Failed to fetch components metadata');
+    const data = await res.json();
+    metaComponents = Object.values(data.meta.components); // [{ node_id, key, name, … }, …]
+  }
+
+  // 2) Potong batch
+  const total = metaComponents.length;
+  const end   = Math.min(start + batchSize, total);
+  const batch = metaComponents.slice(start, end);
+  if (end >= total) isFullyLoaded = true;
+
+  // 3) Fetch thumbnails batch ini saja
+  const ids    = batch.map(c => c.node_id).join(',');
+  const imgRes = await fetch(
+    `https://api.figma.com/v1/images/${FIGMA_FILE_KEY}?ids=${ids}&format=png`,
+    { headers: { 'X-Figma-Token': FIGMA_ACCESS_TOKEN } }
+  );
+  if (!imgRes.ok) throw new Error('Failed to fetch component images');
+  const imgData = await imgRes.json(); // { images: { [node_id]: url } }
+
+  // 4) Gabungkan metadata + thumbnail_url
+  return batch.map(c => ({
+    key:           c.key,
+    name:          c.name,
+    thumbnail_url: imgData.images[c.node_id] || ''
+  }));
+}
+
 // Variabel global untuk menyimpan data master component (detail: key dan nama)
 let masterComponents = [];
+
 
 // Fungsi untuk mengambil dan menyimpan data master component dari Figma
 async function fetchMasterComponents() {
@@ -251,6 +292,65 @@ async function generateMasterPreviews(predictedLabel) {
 
 // Handler untuk pesan dari UI
 figma.ui.onmessage = async (msg) => {
+  if (msg.type === 'load-components') {
+    try {
+      const comps = await fetchComponentsBatch(0);
+      figma.ui.postMessage({
+        type: 'components-loaded',
+        components: comps,
+        isFullyLoaded
+      });
+    } catch (err) {
+      figma.ui.postMessage({ type: 'load-failed', message: err.message });
+    }
+    return;
+  }
+
+  if (msg.type === 'load-more-components') {
+    try {
+      const comps = await fetchComponentsBatch(msg.currentLength);
+      figma.ui.postMessage({
+        type: 'components-loaded',
+        components: comps,
+        isFullyLoaded
+      });
+    } catch (err) {
+      figma.ui.postMessage({ type: 'load-failed', message: err.message });
+    }
+    return;
+  }
+  // ❶ Load list komponen
+  if (msg.type === 'load-master-components') {
+    await fetchMasterComponents();  // sudah pakai FIGMA_ACCESS_TOKEN
+    // kirim nama & key ke UI
+    figma.ui.postMessage({
+      type: 'master-components',
+      components: masterComponents   // [{ name, key }, …]
+    });
+  }
+
+  // ❷ Generate preview per komponen
+  if (msg.type === 'fetch-component-preview') {
+    const { key } = msg;
+    try {
+      // import & export instance jadi PNG
+      const master = await figma.importComponentByKeyAsync(key);
+      const inst   = master.createInstance();
+      inst.x = -9999; inst.y = -9999;
+      figma.currentPage.appendChild(inst);
+      const img = await inst.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:2 }});
+      const b64 = figma.base64Encode(img);
+      inst.remove();
+      // kirim balik ke UI
+      figma.ui.postMessage({
+        type: 'component-preview',
+        key,
+        preview: b64
+      });
+    } catch (e) {
+      console.error('Preview error', e);
+    }
+  }
 
   if (msg.type === 'save-config') {
     FIGMA_FILE_KEY = msg.figmaFileKey;
@@ -362,5 +462,34 @@ figma.ui.onmessage = async (msg) => {
       console.error("Error inserting selected variant:", error);
       figma.notify("Error inserting component.");
     }
+  }
+
+  if (msg.type === 'insert-component') {
+    // 1) Cek seleksi: harus tepat 1 frame
+    const sel = figma.currentPage.selection;
+    if (sel.length !== 1 || sel[0].type !== 'FRAME') {
+      figma.notify('Select one frame');
+      return;
+    }
+    const frame = sel[0];
+
+    try {
+      // 2) Import component dari key
+      const master = await figma.importComponentByKeyAsync(msg.key);
+      // 3) Buat instance
+      const instance = master.createInstance();
+      // 4) Masukkan ke dalam frame
+      frame.appendChild(instance);
+      // 5) Atur posisi (misal pojok kiri atas)
+      instance.x = 0;
+      instance.y = 0;
+      // 6) Scroll dan pilih instance
+      figma.currentPage.selection = [instance];
+      figma.viewport.scrollAndZoomIntoView([instance]);
+    } catch (err) {
+      console.error('Insert component failed', err);
+      figma.notify('Error inserting component.');
+    }
+    return;
   }
 };

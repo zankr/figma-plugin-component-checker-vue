@@ -354,9 +354,8 @@ export default {
 <style scoped>
 
 .img-container {
-  /* opsional: kalau mau tinggi tetap */
+  
   display: flex;
-
   justify-content: center;
   align-items: center;
   height: 205px;
