@@ -2,24 +2,24 @@
   <div class="login-container">
     <div class="login-form">
       <h1 class="h1">Design System Component Checker</h1>
-      <p class="body">Please enter your design system link and CNN Model</p>
+      <h7 class="h7 text-light-dark">Please enter your figma design system link</h7>
 
       <div style="gap: 4px;">
         <label class="body">Design System</label>
         <input class="body" v-model="store.figmaFileKey" type="text" placeholder="" />
-        <label class="body-small text-light-dark">input design system link</label>  
+        <label class="body-small text-light-dark">input figma design system link</label>  
       </div>
       
-      <div style="gap: 4px;">
+      <!-- <div style="gap: 4px;">
         <label class="body">CNN Model</label>   
         <input class="body" v-model="store.cnnModelUrl" type="text" placeholder="" />
         <label class="body-small text-light-dark">input cnn model url</label>
-      </div>
+      </div> -->
       
       <Button block="true" :disabled="!isFormValid" @click="saveConfig()">Save</Button>
 
       <p class="body">
-        Need help? Please read this <span class="link tutorial-link">Tutorial</span>
+        Need help? Please read this <span class="link tutorial-link" @click="goToHelp()">Tutorial</span>
       </p>
     </div>
 
@@ -64,6 +64,10 @@ function saveConfig() {
     '*'
   );
   router.push('/checker');
+}
+
+function goToHelp (){
+  router.push('/help');
 }
 
 

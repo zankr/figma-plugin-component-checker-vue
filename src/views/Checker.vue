@@ -292,6 +292,8 @@ export default {
       }, "*");
     },
 
+    
+
     handleMasterPreview(msg) {
       const { originalId, variants } = msg;
       const idx = this.images.findIndex(item => item.id === originalId);

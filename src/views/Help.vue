@@ -1,135 +1,215 @@
 <template>
-    <div class="plugin-wrapper">
+  <div class="help-page">
+    <!-- Back button -->
+   
+    <div class="plugin-header">
+      <div class="back-container">
+          <button class="btn-back" @click="goBack">
+          🡨 Kembali
+          </button>
+      </div>  
+      
+      <div class="header-text">
+              <h4 class="h4 bold" style="text-align: center;">Hello, how can we help?</h4>
+              <p class="body" style="text-align: center;">Welcome to Help Desk! We're here to assist you with any questions or issues you may have.</p>
+              
+            </div>
+            <div class="header-illustration">
+              <img src="../ui/assets/img-illustration-helping.svg" alt="Illustration" />
+            </div>
 
-        <!-- SIDEBAR KIRI -->
-        <aside class="sidebar">
-        <ul class="sidebar-icons">
-            <li :class="{ 'is-active': $route.path === '/checker' }" @click="goToChecker()">
-            <img src="../ui/assets/icon-checker-default.png" alt="Checker" />
-            </li>
-            <li :class="{ 'is-active': $route.path === '/component' }" @click="goToComponentPage()">
-            <img src="../ui/assets/icon-component-default.png" alt="Component" />
-            </li>
-            <li :class="{ 'is-active': $route.path === '/help' }" @click="goToHelp()">
-            <img src="../ui/assets/icon-help-active.png" alt="Help" />
-            </li>
-        </ul>
-        <div class="sidebar-bottom">
-            <button :class="{ 'is-active': $route.path === '/settings' }" @click="goToSettings()">
-            <img src="../ui/assets/icon-settings-default.png" alt="Settings" />
-            </button>
+      </div>
+
+    <!-- (Optional) Header atas -->
+    
+
+    <!-- Cards + border -->
+    <div class="cards-wrapper">
+      <div class="help-cards">
+        <div
+          v-for="section in sections"
+          :key="section.key"
+          :class="['help-card', { active: currentSection === section.key }]"
+          @click="currentSection = section.key"
+        >
+          <img class="card-icon" :src="section.icon" alt="" />
+          <div class="card-text">
+            <h3 class="body bold" style="justify-content: left;">{{ section.title }}</h3>
+            <p class="body-small text-light-dark" style="justify-content: left;">{{ section.desc }}</p>
+          </div>
+          
         </div>
-        </aside>
-
-
-        <div class="plugin-container">
-
-        </div>
-
-
+      </div>
     </div>
 
-
-
+    <!-- Konten dinamis (hanya area ini yg scrollable) -->
+    <div class="help-content">
+      <keep-alive>
+        <component :is="sectionsMap[currentSection]" />
+      </keep-alive>
+    </div>
+  </div>
 </template>
 
 <script>
-import Button from "../ui/components/Button.vue";
-import { useRouter } from 'vue-router'
+import IntroSection    from './HelpFigmaFileKey.vue'
+import UsageSection    from './UsageSection.vue'
+import AdvancedSection from './AdvancedSection.vue'
 
+// sesuaikan path icon dengan asset-mu
+import figmaIcon       from '../ui/assets/img-illustration-help.png'
+import checkerIcon     from '../ui/assets/img-illustration-help.png'
+import insertIcon      from '../ui/assets/img-illustration-help.png'
 
-export default{
-
-    methods: {
-
-    goToChecker(){
-        this.$router.push('/checker');
-    },
-
-    goToHelp(){
-      this.$router.push('/help');
-    },
-
-    goToSettings(){
-      this.$router.push('/settings');
-
-    },
-
-    goToComponentPage() {
-          this.$router.push('/component');
-
-    },
-
-
+export default {
+  name: 'HelpTutorial',
+  components: { IntroSection, UsageSection, AdvancedSection },
+  data() {
+    return {
+      sections: [
+        { key: 'intro',    title: 'Figma File Key',    desc: 'Cara menemukan figma file key',          icon: figmaIcon },
+        { key: 'usage',    title: 'Component Checker',  desc: 'Cara Menggunakan Component Checker',     icon: checkerIcon },
+        { key: 'advanced', title: 'Insert Component',   desc: 'Cara Insert Design System Component',    icon: insertIcon }
+      ],
+      currentSection: 'intro',
+      sectionsMap: {
+        intro:    'IntroSection',
+        usage:    'UsageSection',
+        advanced: 'AdvancedSection'
+      }
     }
-    
-
-
-};
+  },
+  methods: {
+    goBack() {
+      if (this.$router && this.$router.back) this.$router.back()
+      else window.history.back()
+    }
+  }
+}
 </script>
 
 <style scoped>
-
-/* WRAPPER */
-.plugin-wrapper {
+.help-page {
   display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* SIDEBAR */
-.sidebar {
-  width: 64px;
-  background: var(--clr-secondary);
-  display: flex;
-  box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.15);
   flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 0;
+  height: 100vh;             /* Penuh tinggi viewport/panel */
 }
 
-.sidebar-icons {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* Back button & header */
+.back-container {
+  width: 207px;
+  height: 96px;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: #08A94C;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  /* margin: 1rem 0 0 1rem; */
+}
+
+
+
+.plugin-header {
+  display: flex;
+  justify-content: space-between;
+  background: #F5F8FA;
+  padding: 24px 16px;
+  padding-right: 16px;
+  height: 136px;
+}
+
+.header-text {
+  width: 306px;
+  height: 72px;
+  padding: 12px 0px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.sidebar-icons li,
-.sidebar-bottom button {
-  width: 40px;
-  height: 40px;
-  border-radius: 5px;
-  background-color: var(--clr-secondary);
+.header-illustration {
   display: flex;
+  width: 207px;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-  transition: background-color 0.2s;
 }
 
-.sidebar img {
-  width: 24px;
-  height: 24px;
+.header-illustration img {
+  max-width: 200px;
+  height: auto;
 }
 
-.sidebar-icons li.is-active,
-.sidebar-bottom button.is-active {
-  background-color: #08A94C;
+/* Wrapper kartu + border bawah */
+.cards-wrapper {
+  padding: 16px;          /* ruang bawah untuk border */
+  border-bottom: 1px solid #e0e0e0;
 }
-
-/* MAIN CONTENT */
-.plugin-container {
+.help-cards {
   display: flex;
-  flex-direction: column;
-  flex: 1;
-  overflow-y: auto;
-  gap: 16px;
+  gap: 1rem;
+  overflow-x: auto;              /* bisa digeser horizontal */
+  padding-bottom: .5rem;
+  margin: 0 -1rem;               /* supaya kartu mulai dari tepi */
+  padding: 0 1rem;
+}
+.help-card {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: row;
+  height: 84px;
+  gap: 8px;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #E8ECF5;
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background-color .2s;
+}
+.help-card .card-icon {
+  width: 52px;
+  height: 52px;
+  margin-bottom: .5rem;
+}
+.help-card .card-title {
+  margin: .5rem 0 .25rem;
+  color: #2c3e50;
+  font-size: 1.05rem;
+}
+.help-card .card-desc {
+  margin: 0;
+  color: #777;
+  font-size: .9rem;
+}
+.help-card.active {
+  border-color: #08A94C;
+  background-color: #D5FADD;
+}
+.help-card.active .card-title {
+  color: #386b32;
 }
 
+.card-text {
+  text-align: left;
+  display: flex;
+  justify-content: left;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Konten bawah yang hanya area ini scrollable */
+.help-content {
+  flex: 1;                       /* isi semua sisa ruang */
+  overflow-y: auto;
+  padding: 48px;
+  background: #fff;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
 </style>

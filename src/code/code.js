@@ -16,8 +16,8 @@ async function initConfig() {
   const cfg = await figma.clientStorage.getAsync('plugin-config');
   if (cfg) {
     FIGMA_FILE_KEY = cfg.figmaFileKey || '';
-    CNN_MODEL_URL  = cfg.cnnModelUrl   || '';
-  }
+    CNN_MODEL_URL  = cfg.cnnModelUrl   || ''; 
+  } 
 }
 
 // 3) Tampilkan UI setelah load config, kirim ke UI untuk pre-fill
