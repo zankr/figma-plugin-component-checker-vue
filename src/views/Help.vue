@@ -53,8 +53,8 @@
 
 <script>
 import IntroSection    from './HelpFigmaFileKey.vue'
-import UsageSection    from './UsageSection.vue'
-import AdvancedSection from './AdvancedSection.vue'
+import UsageSection    from './HelpChecker.vue'
+import AdvancedSection from './HelpLibraryComponent.vue'
 
 // sesuaikan path icon dengan asset-mu
 import figmaIcon       from '../ui/assets/img-illustration-help.png'
@@ -147,7 +147,7 @@ export default {
 /* Wrapper kartu + border bawah */
 .cards-wrapper {
   padding: 16px;          /* ruang bawah untuk border */
-  border-bottom: 1px solid #e0e0e0;
+  /* border-bottom: 1px solid #e0e0e0; */
 }
 .help-cards {
   display: flex;

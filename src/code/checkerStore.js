@@ -2,33 +2,32 @@ import { defineStore } from 'pinia'
 
 export const useCheckerStore = defineStore('checker', {
   state: () => ({
-    images: [],
     summary: { total: null, valid: null, invalid: null },
+    images: [],
     noInvalid: false,
     dataReceived: false,
+    isModelReady: false,
+    scrollY: 0
   }),
   actions: {
-    clearAll() {
-      this.images = []
-      this.summary = { total: null, valid: null, invalid: null }
-      this.noInvalid = false
-      this.dataReceived = false
+    setSummary(data) {
+      this.summary = data
     },
-    setSummary({ total, valid, invalid }) {
-      this.summary = { total, valid, invalid }
-      this.noInvalid = invalid === 0
-      this.dataReceived = true
+    setImages(list) {
+      this.images = list
     },
     addImage(item) {
       this.images.push(item)
     },
-    updateImage(id, payload) {
-      const i = this.images.findIndex(x => x.id === id)
-      if (i !== -1) Object.assign(this.images[i], payload)
+    setModelReady(val) {
+      this.isModelReady = val
     },
-    setVariants(originalId, variants) {
-      const i = this.images.findIndex(x => x.id === originalId)
-      if (i !== -1) this.images[i].variants = variants
+    setFlags({ dataReceived, noInvalid }) {
+      this.dataReceived = dataReceived
+      this.noInvalid = noInvalid
     },
-  },
+    setScrollY(y) {
+      this.scrollY = y
+    }
+  }
 })

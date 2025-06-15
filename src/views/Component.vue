@@ -1,217 +1,205 @@
 <template>
-    <div class="plugin-wrapper">
+  <div class="plugin-wrapper">
+    <!-- SIDEBAR KIRI -->
+    <aside class="sidebar">
+          <ul class="sidebar-icons">
+            <li class="tooltip-container" @click="goToChecker" :class="{ 'is-active': $route.path === '/checker' }">
+              <img src="../ui/assets/icon-checker-default.png" alt="Checker" />
+              <span class="tooltip-text">Component Checker</span>
+            </li>
 
-        <!-- SIDEBAR KIRI -->
-        <aside class="sidebar">
-        <ul class="sidebar-icons">
-            <li :class="{ 'is-active': $route.path === '/checker' }" @click="goToChecker()">
-            <img src="../ui/assets/icon-checker-default.png" alt="Checker" />
+            <li class="tooltip-container" @click="goToComponentPage" :class="{ 'is-active': $route.path === '/component' }">
+              <img src="../ui/assets/icon-component-active.png" alt="Component" />
+              <span class="tooltip-text">Component Library</span>
             </li>
-            <li :class="{ 'is-active': $route.path === '/component' }" @click="goToComponentPage()">
-            <img src="../ui/assets/icon-component-active.png" alt="Component" />
+
+            <li class="tooltip-container" @click="goToHelp" :class="{ 'is-active': $route.path === '/help' }">
+              <img src="../ui/assets/icon-help-default.png" alt="Help" />
+              <span class="tooltip-text">Help</span>
             </li>
-            <li :class="{ 'is-active': $route.path === '/help' }" @click="goToHelp()">
-            <img src="../ui/assets/icon-help-default.png" alt="Help" />
-            </li>
-        </ul>
-        <div class="sidebar-bottom">
-            <button :class="{ 'is-active': $route.path === '/settings' }" @click="goToSettings()">
-            <img src="../ui/assets/icon-settings-default.png" alt="Settings" />
+          </ul>
+
+          <div class="sidebar-bottom">
+            <button class="tooltip-container" @click="goToSettings" :class="{ 'is-active': $route.path === '/settings' }">
+              <img src="../ui/assets/icon-settings-default.png" alt="Settings" />
+              <span class="tooltip-text">Settings</span>
             </button>
+          </div>
+      </aside>
+
+    <!-- ISI UTAMA -->
+    <div class="plugin-container">
+      <div class="plugin-header">
+        <div class="header-text">
+          <h4 class="h4 bold">Design System Components</h4>
+          <p class="h7 text-light-dark">Showcases all components available in the design system</p>
+          <div class="search-box">
+            <input
+              v-model="store.searchTerm"
+              @input="onSearch"
+              type="text"
+              placeholder="Search component"
+              class="body-small"
+            />
+          </div>
         </div>
-        </aside>
+        <div class="header-illustration">
+          <img src="../ui/assets/img-background-ds.png" alt="Illustration" />
+        </div>
+      </div>
 
+      <div ref="container" class="component-container" @scroll="onScroll">
+        <div v-if="store.loading && !store.isLoadingMore" class="loading-spinner"></div>
 
-        <div class="plugin-container">
-          <div class="plugin-header">
-            <div class="header-text">
-              <h4 class="h4 bold">Design System Components</h4>
-              <p class="h7 text-light-dark">Showcases all components available in the design system</p>
-              <!-- <Button :disabled="!isModelReady" variant="primary" @click="onClickCheck">
-                Check Components
-              </Button> -->
-              <div class="search-box">
-                <!-- <span class="body-small text-light" style="width: 215px;">Search component</span> -->
-                <input
-                  v-model="searchTerm"
-                  @input="onSearch"
-                  type="text"
-                  placeholder="Search component"
-                  class="body-small"
-                />
-              </div>
-            </div>
-            <div class="header-illustration">
-              <img src="../ui/assets/img-background-ds.png" alt="Illustration" />
-            </div>
+        <div v-for="c in filteredComponents" :key="c.key" class="component-card">
+          <p class="h7">{{ c.name.replace(/^Component\//, '') }}</p>
+          <div class="img-container">
+            <img
+              v-if="c.thumbnail_url"
+              :src="c.thumbnail_url"
+              :alt="c.name"
+              class="component-thumbnail"
+            />
           </div>
-
-          <div
-            ref="container"
-            class="component-container"
-            @scroll="onScroll"
-          >
-            <!-- Spinner loading pertama kali -->
-            <div v-if="loading && !isLoadingMore" class="loading-spinner"></div>
-
-            <!-- Card komponen -->
-            <div
-              v-for="c in filteredComponents"
-              :key="c.key"
-              class="component-card"
-              
-            >
-              <!-- Thumbnail -->
-            
-              <!-- Nama -->
-              <p class="h7">{{ c.name.replace(/^Component\//, '') }}</p>
-            
-              <div class="img-container">
-                <img
-                v-if="c.thumbnail_url"
-                :src="c.thumbnail_url"
-                :alt="c.name"
-                class="component-thumbnail"
-              />
-              </div>
-
-              <Button block="true" variant="primary" @click="insertComponent(c.key)"
-              >Insert Component
-              </Button>
-              
-            </div>
-
-            <!-- Spinner load-more di bawah -->
-            <div v-if="isLoadingMore" class="loading-spinner"></div>
-
-            <!-- Bila tidak ada hasil sama sekali -->
-            <p v-if="!loading && !filteredComponents.length" class="no-results">
-              No components found.
-            </p>
-          </div>
-
+          <Button block="true" variant="primary" @click="insertComponent(c.key)">
+            Insert Component
+          </Button>
         </div>
 
+        <div v-if="store.isLoadingMore" class="loading-spinner"></div>
 
+        <p v-if="!store.loading && !filteredComponents.length" class="no-results">
+          No components found.
+        </p>
+      </div>
     </div>
-
-
-
+  </div>
 </template>
 
 <script>
 import Button from '../ui/components/Button.vue'
+import { useComponentStore } from '../code/componentStore'
+import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
 
 export default {
   name: 'ComponentPage',
   components: { Button },
-  data() {
-    return {
-      components: [],        // semua batch yang sudah di-fetch
-      loading: true,         // true saat batch pertama
-      isLoadingMore: false,  // true saat scroll load-more
-      isFullyLoaded: false,  // jadi true kalau semua batch sudah diambil
-      searchTerm: '',        // filter text
-      cursorPos: { x: 0, y: 0 },
-      allComponents: [],      // metadata lengkap: { key, name, nodeId }
-      searchResults: [],      // hasil search berdasarkan allComponents
-      isSearching: false      // apakah sedang menampilkan hasil search?
-    }
-  },
-  computed: {
-  displayedComponents() {
-    return this.isSearching
-      ? this.searchResults
-      : this.components
-  },
-  filteredComponents() {
-      // filter by name
-      return this.components.filter(c =>
-        c.name.toLowerCase().includes(this.searchTerm.toLowerCase())
+
+  setup() {
+    const store = useComponentStore()
+    const container = ref(null)
+
+    const filteredComponents = computed(() => {
+      return store.components.filter(c =>
+        c.name.toLowerCase().includes(store.searchTerm.toLowerCase())
       )
+    })
+
+    const onScroll = () => {
+      const c = container.value
+      if (
+        !store.isLoadingMore &&
+        !store.isFullyLoaded &&
+        c.scrollTop + c.clientHeight >= c.scrollHeight - 20
+      ) {
+        store.setFlags({ ...store, isLoadingMore: true })
+
+        parent.postMessage({
+          pluginMessage: {
+            type: 'load-more-components',
+            currentLength: store.components.length
+          }
+        }, '*')
+      }
     }
-  },
-  created() {
-    window.addEventListener('message', this.handleMessage)
-  },
-  mounted() {
-    // minta batch pertama
-    parent.postMessage({ pluginMessage: { type: 'load-components' } }, '*')
-  },
-  beforeUnmount() {
-    window.removeEventListener('message', this.handleMessage)
-  },
-  methods: {
-    goToChecker(){
-        this.$router.push('/checker');
-    },
 
-    goToHelp(){
-      this.$router.push('/help');
-    },
-
-    goToSettings(){
-      this.$router.push('/settings');
-
-    },
-
-    goToComponentPage() {
-          this.$router.push('/component');
-
-    },
-
-    handleMessage(event) {
+    const handleMessage = (event) => {
       const msg = event.data.pluginMessage
       if (!msg) return
 
-      // batch pertama atau selanjutnya
       if (msg.type === 'components-loaded') {
-        this.components = this.components.concat(msg.components)
-        this.isFullyLoaded  = msg.isFullyLoaded
-        this.loading        = false
-        this.isLoadingMore  = false
+        store.appendComponents(msg.components)
+        store.setFlags({
+          loading: false,
+          isLoadingMore: false,
+          isFullyLoaded: msg.isFullyLoaded
+        })
       }
 
       if (msg.type === 'load-failed') {
         alert('Failed to load components: ' + msg.message)
-        this.loading       = false
-        this.isLoadingMore = false
+        store.setFlags({
+          loading: false,
+          isLoadingMore: false,
+          isFullyLoaded: false
+        })
       }
-    },
+    }
 
-    onScroll() {
-      const c = this.$refs.container
-      // ketika scroll hampir di bawah, dan masih ada batch tersisa
-      if (
-        !this.isLoadingMore &&
-        !this.isFullyLoaded &&
-        c.scrollTop + c.clientHeight >= c.scrollHeight - 20
-      ) {
-        this.isLoadingMore = true
-        parent.postMessage({
-          pluginMessage: {
-            type: 'load-more-components',
-            currentLength: this.components.length
-          }
-        }, '*')
+    const onSearch = () => {
+      // nothing needed — searchTerm is reactive
+    }
+
+    const insertComponent = (key) => {
+      parent.postMessage({
+        pluginMessage: {
+          type: 'insert-component',
+          key: key
+        }
+      }, '*')
+    }
+
+    const goToChecker = () => {
+      store.setScrollY(window.scrollY)
+      window.scrollTo(0, 0)
+      window.removeEventListener('message', handleMessage)
+      location.href = '#/checker'
+    }
+
+    const goToHelp = () => {
+      store.setScrollY(window.scrollY)
+      location.href = '#/help'
+    }
+
+    const goToSettings = () => {
+      store.setScrollY(window.scrollY)
+      location.href = '#/settings'
+    }
+
+    const goToComponentPage = () => {
+      // stay on page
+    }
+
+    onMounted(() => {
+      window.scrollTo(0, store.scrollY)
+      window.addEventListener('message', handleMessage)
+
+      if (store.components.length === 0) {
+        parent.postMessage({ pluginMessage: { type: 'load-components' } }, '*')
       }
-    },
+    })
 
-    onSearch() {
-      // nothing extra—filteredComponents akan otomatis update
-    },
+    onBeforeUnmount(() => {
+      store.setScrollY(window.scrollY)
+      window.removeEventListener('message', handleMessage)
+    })
 
-    insertComponent(key) {
-    parent.postMessage({
-      pluginMessage: {
-        type: 'insert-component',
-        key: key
-      }
-    }, '*')
-  }
+    return {
+      store,
+      container,
+      filteredComponents,
+      onScroll,
+      onSearch,
+      insertComponent,
+      goToChecker,
+      goToHelp,
+      goToSettings,
+      goToComponentPage
+    }
   }
 }
 </script>
+
 
 <style scoped>
 /* WRAPPER */
@@ -222,6 +210,51 @@ export default {
 }
 
 /* SIDEBAR */
+
+
+.tooltip-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tooltip-text {
+  position: absolute;
+  left: 48px; /* Jarak ke kanan dari ikon */
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #333F47;
+  color: #F5F5F5;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.tooltip-container:hover .tooltip-text {
+  opacity: 1;
+}
+
+/* Arrow segitiga di kiri */
+.tooltip-text::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid #2D2F36;
+}
+
 .sidebar {
   width: 64px;
   background: var(--clr-secondary);
@@ -231,13 +264,14 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 16px 0;
+  overflow: visible;
 }
 
 .sidebar-icons {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
+  display: flex; 
   flex-direction: column;
   gap: 16px;
 }
