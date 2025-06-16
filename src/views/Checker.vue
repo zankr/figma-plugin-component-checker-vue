@@ -114,10 +114,10 @@
 
 <script>
 import * as tf from "@tensorflow/tfjs"
+import { ref, reactive, toRaw, watch, onMounted, onBeforeUnmount } from "vue"
 import Button from "../ui/components/Button.vue"
-import { toRaw, reactive, onMounted, onBeforeUnmount } from "vue"
-import { useConfigStore } from "../code/configStore.js"
-import { useCheckerStore } from "../code/checkerStore.js"
+import { useCheckerStore } from "../code/checkerStore"
+import { useConfigStore } from "../code/configStore"
 
 export default {
   name: "Checker",
@@ -125,106 +125,70 @@ export default {
 
   setup() {
     const checker = useCheckerStore()
+    const config = useConfigStore()
 
-    onMounted(() => {
-      window.scrollTo(0, checker.scrollY)
-    })
+    const model = ref(null)
+    const classLabels = ref([])
+    const fileChanged = ref(false)
+    const lastUsedKey = ref("")
 
-    onBeforeUnmount(() => {
-      checker.setScrollY(window.scrollY)
-    })
 
-    return { checker }
-  },
-
-  mounted() {
-    this.loadModel()
-
-    window.addEventListener("message", (event) => {
-      const msg = event.data.pluginMessage
-      if (!msg) return
-      switch (msg.type) {
-        case "clearImages":
-          this.checker.setImages([])
-          return
-        case "summary":
-          this.handleSummary(msg)
-          break
-        case "exportImage":
-          this.handleExportImage(msg)
-          break
-        case "noInvalidInstances":
-          this.checker.setFlags({ dataReceived: true, noInvalid: true })
-          this.checker.setImages([])
-          break
-        case "masterPreview":
-          this.handleMasterPreview(msg)
-          break
-      }
-    })
-  },
-
-  methods: {
-    goToChecker() {
-      this.$router.push("/checker")
-    },
-    goToHelp() {
-      this.$router.push("/help")
-    },
-    goToSettings() {
-      this.$router.push("/settings")
-    },
-    goToComponentPage() {
-      this.$router.push("/component")
-    },
-    async loadModel() {
+    // ⏳ Load model awal
+    const loadModel = async () => {
       try {
         await tf.ready()
-        const store = useConfigStore()
-        const modelUrl = store.cnnModelUrl
-        if (!modelUrl) throw new Error("CNN Model URL belum di-set!")
+        if (!config.cnnModelUrl) throw new Error("CNN Model URL belum di-set!")
 
-        this.model = await tf.loadLayersModel(modelUrl)
-
-        const metadataUrl = modelUrl.replace("model.json", "metadata.json")
+        model.value = await tf.loadLayersModel(config.cnnModelUrl)
+        const metadataUrl = config.cnnModelUrl.replace("model.json", "metadata.json")
         const metadata = await fetch(metadataUrl).then(res => res.json())
 
-        this.classLabels = metadata.labels || []
-        this.checker.setModelReady(true)
-        console.log(metadata)
-        
+        classLabels.value = metadata.labels || []
+        checker.setModelReady(true)
+        console.log("✅ Model loaded:", metadata)
       } catch (err) {
         console.error("❌ Error saat load model:", err)
       }
-    },
-    onClickCheck() {
-      if (!this.checker.isModelReady) {
+    }
+
+    // 👁️ Watch figmaFileKey dan reset jika berubah
+    watch(() => config.figmaFileKey, (newKey, oldKey) => {
+      if (newKey && newKey !== oldKey) {
+        console.log("🔁 figmaFileKey changed:", oldKey, "→", newKey)
+
+        checker.setImages([])
+        checker.setSummary({ total: null, valid: null, invalid: null })
+        checker.setFlags({ dataReceived: false, noInvalid: false })
+
+        fileChanged.value = true
+      }
+    })
+
+    // 🔘 Saat user klik Check
+    const onClickCheck = () => {
+      if (!checker.isModelReady) {
         console.warn("Model belum siap.")
         return
       }
-      this.checker.setImages([])
-      this.checker.setSummary({ total: null, valid: null, invalid: null })
-      this.checker.setFlags({ dataReceived: false, noInvalid: false })
+      
+      console.log("📤 Sending check-components for:", config.figmaFileKey)
 
-      const store = useConfigStore()
+      checker.setImages([])
+      checker.setSummary({ total: null, valid: null, invalid: null })
+      checker.setFlags({ dataReceived: false, noInvalid: false })
+      fileChanged.value = false
+
       window.parent.postMessage({
         pluginMessage: {
           type: "check-components",
-          figmaFileKey: store.figmaFileKey,
-          cnnModelUrl: store.cnnModelUrl
+          figmaFileKey: config.figmaFileKey,
+          cnnModelUrl: config.cnnModelUrl
         }
       }, "*")
-    },
-    handleSummary(msg) {
-      this.checker.setFlags({ dataReceived: true, noInvalid: msg.invalid === 0 })
-      this.checker.setSummary({
-        total: msg.total,
-        valid: msg.valid,
-        invalid: msg.invalid
-      })
-    },
-    async handleExportImage(msg) {
-      if (this.checker.images.some(item => item.id === msg.id)) return
+    }
+
+    const handleExportImage = async (msg) => {
+      if (checker.images.some(item => item.id === msg.id)) return
 
       const blob = new Blob([Uint8Array.from(atob(msg.data), c => c.charCodeAt(0))], { type: "image/png" })
       const blobUrl = URL.createObjectURL(blob)
@@ -238,7 +202,7 @@ export default {
         variants: []
       })
 
-      this.checker.addImage(newItem)
+      checker.addImage(newItem)
 
       const img = new Image()
       img.src = blobUrl
@@ -252,21 +216,19 @@ export default {
         let tensorImage = tf.browser.fromPixels(ctx.getImageData(0, 0, canvas.width, canvas.height)).toFloat()
         tensorImage = tf.image.resizeBilinear(tensorImage, [224, 224]).div(255.0).expandDims(0)
 
-        const rawModel = toRaw(this.model)
+        const rawModel = toRaw(model.value)
         const predictionTensor = rawModel.predict(tensorImage)
         const dataArray = await predictionTensor.data()
 
         const maxIndex = dataArray.indexOf(Math.max(...dataArray))
-        newItem.predictedLabel = this.classLabels[maxIndex] || `Index ${maxIndex}`
+        newItem.predictedLabel = classLabels.value[maxIndex] || `Index ${maxIndex}`
         newItem.confidence = dataArray[maxIndex]
 
-        this.fetchMasterPreview(newItem.predictedLabel, newItem.id)
+        fetchMasterPreview(newItem.predictedLabel, newItem.id)
       }
-    },
-    goToComponent(predictedLabel, originalId) {
-      window.parent.postMessage({ pluginMessage: { type: "go-to-component", id: originalId } }, "*")
-    },
-    fetchMasterPreview(predictedLabel, originalId) {
+    }
+
+    const fetchMasterPreview = (predictedLabel, originalId) => {
       window.parent.postMessage({
         pluginMessage: {
           type: "fetch-master-preview",
@@ -274,18 +236,20 @@ export default {
           originalId
         }
       }, "*")
-    },
-    handleMasterPreview(msg) {
-      const idx = this.checker.images.findIndex(item => item.id === msg.originalId)
+    }
+
+    const handleMasterPreview = (msg) => {
+      const idx = checker.images.findIndex(item => item.id === msg.originalId)
       if (idx !== -1) {
-        this.checker.images[idx].variants = msg.variants.map(v => ({
+        checker.images[idx].variants = msg.variants.map(v => ({
           name: v.name,
           key: v.key,
           previewUrl: "data:image/png;base64," + v.preview
         }))
       }
-    },
-    insertVariant(key, originalId) {
+    }
+
+    const insertVariant = (key, originalId) => {
       window.parent.postMessage({
         pluginMessage: {
           type: "user-selected-variant",
@@ -294,9 +258,90 @@ export default {
         }
       }, "*")
     }
+
+    const goToChecker = () => window.location.href = "#/checker"
+    const goToHelp = () => window.location.href = "#/help"
+    const goToSettings = () => window.location.href = "#/settings"
+    const goToComponentPage = () => window.location.href = "#/component"
+    const goToComponent = (predictedLabel, id) => {
+      window.parent.postMessage({ pluginMessage: { type: "go-to-component", id } }, "*")
+    }
+
+    // 📨 Terima pesan dari plugin
+    const handleMessage = (event) => {
+      const msg = event.data.pluginMessage
+      if (!msg) return
+
+      switch (msg.type) {
+        case "clearImages":
+          checker.setImages([])
+          break
+        case "summary":
+          checker.setFlags({ dataReceived: true, noInvalid: msg.invalid === 0 })
+          checker.setSummary({
+            total: msg.total,
+            valid: msg.valid,
+            invalid: msg.invalid
+          })
+          break
+        case "noInvalidInstances":
+          checker.setFlags({ dataReceived: true, noInvalid: true })
+          checker.setImages([])
+          break
+        case "exportImage":
+          handleExportImage(msg)
+          break
+        case "masterPreview":
+          handleMasterPreview(msg)
+          break
+        case "components-loaded":
+          console.log("✅ Fetched master components:", msg.components)
+          break
+      }
+    }
+
+    onMounted(() => {
+      window.scrollTo(0, checker.scrollY)
+      loadModel()
+      window.addEventListener("message", handleMessage)
+
+      lastUsedKey.value = config.figmaFileKey
+
+      // Cek saat mount, apakah fileKey berubah sejak terakhir
+      if (checker.lastUsedKey && checker.lastUsedKey !== config.figmaFileKey) {
+        console.log("⚠️ figmaFileKey berbeda dari sebelumnya. Harus cek ulang.")
+        fileChanged.value = true
+
+        checker.setImages([])
+        checker.setSummary({ total: null, valid: null, invalid: null })
+        checker.setFlags({ dataReceived: false, noInvalid: false })
+      }
+
+      // Simpan key untuk next check
+      checker.lastUsedKey = config.figmaFileKey
+    })
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("message", handleMessage)
+      checker.setScrollY(window.scrollY)
+    })
+
+    return {
+      checker,
+      onClickCheck,
+      insertVariant,
+      goToComponent,
+      goToChecker,
+      goToHelp,
+      goToSettings,
+      goToComponentPage,
+      fileChanged
+    }
   }
 }
 </script>
+
+
 
 <style scoped>
 

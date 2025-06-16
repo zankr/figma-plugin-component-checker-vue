@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [vue(), viteSingleFile()],
   build: {
 		target: "esnext",
-		outDir: "dist/src/ui",  // <-- penting!
+		outDir: "dist/src/ui",  
 		assetsInlineLimit: 100000000,
 		chunkSizeWarningLimit: 100000000,
 		cssCodeSplit: false,

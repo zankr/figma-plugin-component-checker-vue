@@ -2,37 +2,52 @@
   <div class="plugin-wrapper">
     <!-- SIDEBAR KIRI -->
     <aside class="sidebar">
-          <ul class="sidebar-icons">
-            <li class="tooltip-container" @click="goToChecker" :class="{ 'is-active': $route.path === '/checker' }">
-              <img src="../ui/assets/icon-checker-default.png" alt="Checker" />
-              <span class="tooltip-text">Component Checker</span>
-            </li>
-
-            <li class="tooltip-container" @click="goToComponentPage" :class="{ 'is-active': $route.path === '/component' }">
-              <img src="../ui/assets/icon-component-active.png" alt="Component" />
-              <span class="tooltip-text">Component Library</span>
-            </li>
-
-            <li class="tooltip-container" @click="goToHelp" :class="{ 'is-active': $route.path === '/help' }">
-              <img src="../ui/assets/icon-help-default.png" alt="Help" />
-              <span class="tooltip-text">Help</span>
-            </li>
-          </ul>
-
-          <div class="sidebar-bottom">
-            <button class="tooltip-container" @click="goToSettings" :class="{ 'is-active': $route.path === '/settings' }">
-              <img src="../ui/assets/icon-settings-default.png" alt="Settings" />
-              <span class="tooltip-text">Settings</span>
-            </button>
-          </div>
-      </aside>
+      <ul class="sidebar-icons">
+        <li
+          class="tooltip-container"
+          @click="goToChecker"
+          :class="{ 'is-active': $route.path === '/checker' }"
+        >
+          <img src="../ui/assets/icon-checker-default.png" alt="Checker" />
+          <span class="tooltip-text">Component Checker</span>
+        </li>
+        <li
+          class="tooltip-container"
+          @click="goToComponentPage"
+          :class="{ 'is-active': $route.path === '/component' }"
+        >
+          <img src="../ui/assets/icon-component-active.png" alt="Component" />
+          <span class="tooltip-text">Component Library</span>
+        </li>
+        <li
+          class="tooltip-container"
+          @click="goToHelp"
+          :class="{ 'is-active': $route.path === '/help' }"
+        >
+          <img src="../ui/assets/icon-help-default.png" alt="Help" />
+          <span class="tooltip-text">Help</span>
+        </li>
+      </ul>
+      <div class="sidebar-bottom">
+        <button
+          class="tooltip-container"
+          @click="goToSettings"
+          :class="{ 'is-active': $route.path === '/settings' }"
+        >
+          <img src="../ui/assets/icon-settings-default.png" alt="Settings" />
+          <span class="tooltip-text">Settings</span>
+        </button>
+      </div>
+    </aside>
 
     <!-- ISI UTAMA -->
     <div class="plugin-container">
       <div class="plugin-header">
         <div class="header-text">
           <h4 class="h4 bold">Design System Components</h4>
-          <p class="h7 text-light-dark">Showcases all components available in the design system</p>
+          <p class="h7 text-light-dark">
+            Showcases all components available in the design system
+          </p>
           <div class="search-box">
             <input
               v-model="store.searchTerm"
@@ -61,13 +76,12 @@
               class="component-thumbnail"
             />
           </div>
-          <Button block="true" variant="primary" @click="insertComponent(c.key)">
+          <Button block @click="insertComponent(c.key)">
             Insert Component
           </Button>
         </div>
 
         <div v-if="store.isLoadingMore" class="loading-spinner"></div>
-
         <p v-if="!store.loading && !filteredComponents.length" class="no-results">
           No components found.
         </p>
@@ -79,21 +93,40 @@
 <script>
 import Button from '../ui/components/Button.vue'
 import { useComponentStore } from '../code/componentStore'
-import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
+import { useConfigStore } from '../code/configStore'
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 
 export default {
   name: 'ComponentPage',
   components: { Button },
 
   setup() {
-    const store = useComponentStore()
+    const config    = useConfigStore()
+    const store     = useComponentStore()
     const container = ref(null)
 
-    const filteredComponents = computed(() => {
-      return store.components.filter(c =>
+    // 1) Watch: hanya reset & reload jika figmaFileKey benar-benar berubah
+    watch(
+      () => config.figmaFileKey,
+      (newKey, oldKey) => {
+        if (newKey && newKey !== oldKey) {
+          store.resetStore()
+          store.setCurrentFileKey(newKey)
+          parent.postMessage({
+            pluginMessage: {
+              type: 'load-components',
+              figmaFileKey: newKey
+            }
+          }, '*')
+        }
+      }
+    )
+
+    const filteredComponents = computed(() =>
+      store.components.filter(c =>
         c.name.toLowerCase().includes(store.searchTerm.toLowerCase())
       )
-    })
+    )
 
     const onScroll = () => {
       const c = container.value
@@ -102,8 +135,11 @@ export default {
         !store.isFullyLoaded &&
         c.scrollTop + c.clientHeight >= c.scrollHeight - 20
       ) {
-        store.setFlags({ ...store, isLoadingMore: true })
-
+        store.setFlags({
+          loading: false,
+          isLoadingMore: true,
+          isFullyLoaded: false
+        })
         parent.postMessage({
           pluginMessage: {
             type: 'load-more-components',
@@ -125,7 +161,6 @@ export default {
           isFullyLoaded: msg.isFullyLoaded
         })
       }
-
       if (msg.type === 'load-failed') {
         alert('Failed to load components: ' + msg.message)
         store.setFlags({
@@ -136,46 +171,40 @@ export default {
       }
     }
 
-    const onSearch = () => {
-      // nothing needed — searchTerm is reactive
-    }
-
-    const insertComponent = (key) => {
-      parent.postMessage({
-        pluginMessage: {
-          type: 'insert-component',
-          key: key
-        }
-      }, '*')
-    }
-
+    const onSearch = () => {}
+    const insertComponent = (key) =>
+      parent.postMessage({ pluginMessage: { type: 'insert-component', key } }, '*')
     const goToChecker = () => {
       store.setScrollY(window.scrollY)
       window.scrollTo(0, 0)
       window.removeEventListener('message', handleMessage)
       location.href = '#/checker'
     }
-
     const goToHelp = () => {
       store.setScrollY(window.scrollY)
       location.href = '#/help'
     }
-
     const goToSettings = () => {
       store.setScrollY(window.scrollY)
       location.href = '#/settings'
     }
-
-    const goToComponentPage = () => {
-      // stay on page
-    }
+    const goToComponentPage = () => {}
 
     onMounted(() => {
       window.scrollTo(0, store.scrollY)
       window.addEventListener('message', handleMessage)
 
-      if (store.components.length === 0) {
-        parent.postMessage({ pluginMessage: { type: 'load-components' } }, '*')
+      // 2) Pada mount: compare currentFileKey vs config.figmaFileKey
+      const key = config.figmaFileKey
+      if (store.currentFileKey !== key) {
+        store.resetStore()
+        store.setCurrentFileKey(key)
+        parent.postMessage({
+          pluginMessage: {
+            type: 'load-components',
+            figmaFileKey: key
+          }
+        }, '*')
       }
     })
 
@@ -199,6 +228,7 @@ export default {
   }
 }
 </script>
+
 
 
 <style scoped>

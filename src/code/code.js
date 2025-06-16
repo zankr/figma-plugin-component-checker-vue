@@ -1,64 +1,61 @@
 // Menampilkan UI dengan ukuran 800x600
 figma.showUI(__html__, { width: 800, height: 600 });
 
-// 1) Variabel global untuk config
 let FIGMA_FILE_KEY = '';
 let CNN_MODEL_URL  = '';
 const FIGMA_ACCESS_TOKEN = "figd_dqS-9HS38jaKupAx9-t-LC4j2znS9a0m7icKdX_P";
+let lastFetchedKey = '';
 
-// 1.a) Lazy‐load state untuk Component Page
-let metaComponents   = [];     // semua metadata komponen
-let isFullyLoaded    = false;  // flag jika semua sudah diambil
-const batchSize      = 20;     // ukuran tiap batch
+// 1.a) State lazy‐load untuk Component Page
+let metaComponents   = [];
+let isFullyLoaded    = false;
+const batchSize      = 20;
 
-// 2) Load config dari figma.clientStorage
+// 2) Load config dari clientStorage
 async function initConfig() {
   const cfg = await figma.clientStorage.getAsync('plugin-config');
   if (cfg) {
     FIGMA_FILE_KEY = cfg.figmaFileKey || '';
-    CNN_MODEL_URL  = cfg.cnnModelUrl   || ''; 
-  } 
+    CNN_MODEL_URL  = cfg.cnnModelUrl   || '';
+  }
 }
 
-// 3) Tampilkan UI setelah load config, kirim ke UI untuk pre-fill
+// 3) Setelah config ter-load, kirim ke UI untuk prefill
 (async () => {
   await initConfig();
-  // figma.showUI(__html__, { width: 800, height: 600 });
   figma.ui.postMessage({
     type: 'load-config',
     figmaFileKey: FIGMA_FILE_KEY,
-    cnnModelUrl:   CNN_MODEL_URL
+    cnnModelUrl:  CNN_MODEL_URL
   });
 })();
 
+// Fetch satu batch metadata + thumbnail
 async function fetchComponentsBatch(start = 0) {
-  // 1) Fetch metadata sekali saja
-  if (metaComponents.length === 0) {
-    const res = await fetch(
-      `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`,
-      { headers: { 'X-Figma-Token': FIGMA_ACCESS_TOKEN } }
-    );
-    if (!res.ok) throw new Error('Failed to fetch components metadata');
-    const data = await res.json();
-    metaComponents = Object.values(data.meta.components); // [{ node_id, key, name, … }, …]
-  }
+  if (metaComponents.length === 0 || FIGMA_FILE_KEY !== lastFetchedKey) {
+  lastFetchedKey = FIGMA_FILE_KEY;
+  const res = await fetch(
+    `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`,
+    { headers: { 'X-Figma-Token': FIGMA_ACCESS_TOKEN } }
+  );
+  if (!res.ok) throw new Error('Failed to fetch components metadata');
+  const data = await res.json();
+  metaComponents = Object.values(data.meta.components);
+}
 
-  // 2) Potong batch
   const total = metaComponents.length;
   const end   = Math.min(start + batchSize, total);
   const batch = metaComponents.slice(start, end);
   if (end >= total) isFullyLoaded = true;
 
-  // 3) Fetch thumbnails batch ini saja
   const ids    = batch.map(c => c.node_id).join(',');
   const imgRes = await fetch(
     `https://api.figma.com/v1/images/${FIGMA_FILE_KEY}?ids=${ids}&format=png`,
     { headers: { 'X-Figma-Token': FIGMA_ACCESS_TOKEN } }
   );
   if (!imgRes.ok) throw new Error('Failed to fetch component images');
-  const imgData = await imgRes.json(); // { images: { [node_id]: url } }
+  const imgData = await imgRes.json();
 
-  // 4) Gabungkan metadata + thumbnail_url
   return batch.map(c => ({
     key:           c.key,
     name:          c.name,
@@ -66,16 +63,10 @@ async function fetchComponentsBatch(start = 0) {
   }));
 }
 
-// Variabel global untuk menyimpan data master component (detail: key dan nama)
+// Master components untuk Checker
 let masterComponents = [];
-
-
-// Fungsi untuk mengambil dan menyimpan data master component dari Figma
 async function fetchMasterComponents() {
-  const FIGMA_ACCESS_TOKEN = "figd_dqS-9HS38jaKupAx9-t-LC4j2znS9a0m7icKdX_P";
-  // const FIGMA_FILE_KEY = "HIHSBFb6tatYWQYl2LudlV";
   const url = `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`;
-
   if (masterComponents.length === 0) {
     try {
       const response = await fetch(url, {
@@ -83,15 +74,14 @@ async function fetchMasterComponents() {
       });
       if (!response.ok) throw new Error("Failed to fetch components");
       const data = await response.json();
-      const components = Object.values(data.meta.components);
-      masterComponents = components.map(component => ({
-        key: component.key,
-        name: component.name
+      masterComponents = Object.values(data.meta.components).map(c => ({
+        key: c.key,
+        name: c.name
       }));
       console.log("Fetched master components:", masterComponents);
-    } catch (error) {
-      console.error("Error fetching components:", error);
-      figma.notify("Error fetching components. Check console for details.");
+    } catch (err) {
+      console.error("Error fetching master components:", err);
+      figma.notify("Error fetching master components. See console.");
     }
   }
 }
@@ -292,7 +282,46 @@ async function generateMasterPreviews(predictedLabel) {
 
 // Handler untuk pesan dari UI
 figma.ui.onmessage = async (msg) => {
+  // — save-config: simpan ke global + clientStorage + notify UI
+  if (msg.type === 'save-config') {
+    FIGMA_FILE_KEY = msg.figmaFileKey;
+    CNN_MODEL_URL  = msg.cnnModelUrl;
+    await figma.clientStorage.setAsync('plugin-config', {
+      figmaFileKey: FIGMA_FILE_KEY,
+      cnnModelUrl:  CNN_MODEL_URL
+    });
+    // beri tahu UI bahwa config sudah tersimpan
+    figma.ui.postMessage({
+      type: 'config-saved',
+      figmaFileKey: FIGMA_FILE_KEY,
+      cnnModelUrl:  CNN_MODEL_URL
+    });
+    // figma.ui.postMessage({ type: 'load-components', figmaFileKey: FIGMA_FILE_KEY });
+
+    return;
+  }
+
+  // — load-config: kirim config untuk prefill form di Settings
+  if (msg.type === 'load-config') {
+    figma.ui.postMessage({
+      type: 'load-config',
+      figmaFileKey: FIGMA_FILE_KEY,
+      cnnModelUrl:  CNN_MODEL_URL
+    });
+    return;
+  }
+
+  // — load-components: initial atau setelah ganti key
   if (msg.type === 'load-components') {
+    // ambil key yang dikirim UI
+    const newKey = msg.figmaFileKey;
+    // jika berubah, reset cache & update global
+    if (newKey && newKey !== FIGMA_FILE_KEY) {
+      FIGMA_FILE_KEY   = newKey;
+      metaComponents   = [];
+      isFullyLoaded    = false;
+      masterComponents = [];
+    }
     try {
       const comps = await fetchComponentsBatch(0);
       figma.ui.postMessage({
@@ -306,6 +335,7 @@ figma.ui.onmessage = async (msg) => {
     return;
   }
 
+  // — load-more-components: pagination
   if (msg.type === 'load-more-components') {
     try {
       const comps = await fetchComponentsBatch(msg.currentLength);
@@ -319,6 +349,7 @@ figma.ui.onmessage = async (msg) => {
     }
     return;
   }
+
   // ❶ Load list komponen
   if (msg.type === 'load-master-components') {
     await fetchMasterComponents();  // sudah pakai FIGMA_ACCESS_TOKEN
@@ -353,28 +384,51 @@ figma.ui.onmessage = async (msg) => {
   }
 
   if (msg.type === 'save-config') {
-    FIGMA_FILE_KEY = msg.figmaFileKey;
-    CNN_MODEL_URL  = msg.cnnModelUrl;
+    FIGMA_FILE_KEY = msg.figmaFileKey
+    CNN_MODEL_URL  = msg.cnnModelUrl
     await figma.clientStorage.setAsync('plugin-config', {
       figmaFileKey: FIGMA_FILE_KEY,
       cnnModelUrl:   CNN_MODEL_URL
-    });
-    return;
+    })
+    // notify UI supaya bisa trigger reload (opsional)
+    figma.ui.postMessage({
+      type: 'config-saved',
+      figmaFileKey: FIGMA_FILE_KEY
+    })
+    return
   }
 
   if (msg.type === "check-components") {
+    const newKey = msg.figmaFileKey;
+
+    // ✅ Update FIGMA_FILE_KEY jika berbeda
+    if (FIGMA_FILE_KEY !== lastFetchedKey) {
+      lastFetchedKey = FIGMA_FILE_KEY;
+      // lastFetchedKey = '';              // ✅ Reset ini
+      metaComponents = [];
+      masterComponents = [];
+      isFullyLoaded = false;
+      console.log("🔁 FIGMA_FILE_KEY updated:", FIGMA_FILE_KEY);
+    }
+
     const selection = figma.currentPage.selection;
     if (selection.length !== 1 || selection[0].type !== "FRAME") {
       figma.notify("Please select one frame.");
       return;
-    } 
+    }
+
     const frame = selection[0];
+
+    // ✅ Fetch master components dengan key yang sudah diupdate
     await fetchMasterComponents();
+
     if (masterComponents.length === 0) {
       figma.notify("Master components not available.");
       return;
     }
+
     const result = await checkInstancesInFrame(frame);
+
     figma.ui.postMessage({ type: "clearImages" });
     figma.ui.postMessage({
       type: "summary",
@@ -382,8 +436,10 @@ figma.ui.onmessage = async (msg) => {
       valid: result.valid,
       invalid: result.invalid,
     });
+
     if (result.invalidInstances.length > 0) {
       figma.notify(`${result.invalid} invalid instances found. Exporting images.`);
+
       for (const instance of result.invalidInstances) {
         await exportNodeAsPng(instance);
       }
@@ -391,6 +447,7 @@ figma.ui.onmessage = async (msg) => {
       figma.notify("All instances are valid. No images exported.");
     }
   }
+
 
   if (msg.type === "go-to-component") {
     try {
