@@ -11,24 +11,6 @@ let metaComponents   = [];
 let isFullyLoaded    = false;
 const batchSize      = 20;
 
-// 2) Load config dari clientStorage
-async function initConfig() {
-  const cfg = await figma.clientStorage.getAsync('plugin-config');
-  if (cfg) {
-    FIGMA_FILE_KEY = cfg.figmaFileKey || '';
-    CNN_MODEL_URL  = cfg.cnnModelUrl   || '';
-  }
-}
-
-// 3) Setelah config ter-load, kirim ke UI untuk prefill
-(async () => {
-  await initConfig();
-  figma.ui.postMessage({
-    type: 'load-config',
-    figmaFileKey: FIGMA_FILE_KEY,
-    cnnModelUrl:  CNN_MODEL_URL
-  });
-})();
 
 // Fetch satu batch metadata + thumbnail
 async function fetchComponentsBatch(start = 0) {
@@ -82,6 +64,8 @@ async function fetchMasterComponents() {
     } catch (err) {
       console.error("Error fetching master components:", err);
       figma.notify("Error fetching master components. See console.");
+      
+    
     }
   }
 }
@@ -134,28 +118,7 @@ async function checkInstancesInFrame(frame) {
   return result;
 }
 
-function isPlainTextOnly(node) {
-  // Kalau bukan FRAME atau GROUP, langsung false
-  if (node.type !== "FRAME" && node.type !== "GROUP") return false;
 
-  // Recursive check semua descendant
-  function checkChildren(nodes) {
-    for (const child of nodes) {
-      if (child.type === "TEXT") {
-        continue; // OK
-      } else if (child.type === "FRAME" || child.type === "GROUP") {
-        if (!checkChildren(child.children)) {
-          return false; // Kalau child group/frame isinya bukan text, gagal
-        }
-      } else {
-        return false; // Ada node lain selain TEXT / FRAME / GROUP
-      }
-    }
-    return true;
-  }
-
-  return checkChildren(node.children);
-}
 
 async function exportNodeAsPng(node) {
   try {
@@ -189,7 +152,7 @@ async function exportNodeAsPng(node) {
 }
 
 // Fungsi untuk mengirim data gambar ke UI
-function sendToUi(name, id, imageData, predictedLabel = "", confidence = "") {
+function sendToUi(name, id, imageData, predictedLabel = "") {
   const base64Data = figma.base64Encode(imageData);
   figma.ui.postMessage({ 
     type: "exportImage", 
@@ -197,7 +160,7 @@ function sendToUi(name, id, imageData, predictedLabel = "", confidence = "") {
     id, 
     data: base64Data, 
     predictedLabel, 
-    confidence 
+     
   });
 }
 
@@ -284,22 +247,24 @@ async function generateMasterPreviews(predictedLabel) {
 figma.ui.onmessage = async (msg) => {
   // — save-config: simpan ke global + clientStorage + notify UI
   if (msg.type === 'save-config') {
-    FIGMA_FILE_KEY = msg.figmaFileKey;
-    CNN_MODEL_URL  = msg.cnnModelUrl;
-    await figma.clientStorage.setAsync('plugin-config', {
-      figmaFileKey: FIGMA_FILE_KEY,
-      cnnModelUrl:  CNN_MODEL_URL
-    });
-    // beri tahu UI bahwa config sudah tersimpan
-    figma.ui.postMessage({
-      type: 'config-saved',
-      figmaFileKey: FIGMA_FILE_KEY,
-      cnnModelUrl:  CNN_MODEL_URL
-    });
-    // figma.ui.postMessage({ type: 'load-components', figmaFileKey: FIGMA_FILE_KEY });
+  FIGMA_FILE_KEY = msg.figmaFileKey;
+  CNN_MODEL_URL  = msg.cnnModelUrl;
+  // await figma.clientStorage.setAsync('plugin-config', {
+  //   figmaFileKey: FIGMA_FILE_KEY,
+  //   cnnModelUrl:  CNN_MODEL_URL,
+  // });
+  
+  // kirim pesan ke UI
+  figma.ui.postMessage({
+    type: 'config-saved',
+    figmaFileKey: FIGMA_FILE_KEY,
+    cnnModelUrl:  CNN_MODEL_URL
+  });
+  
 
-    return;
+  return;
   }
+
 
   // — load-config: kirim config untuk prefill form di Settings
   if (msg.type === 'load-config') {
@@ -383,20 +348,20 @@ figma.ui.onmessage = async (msg) => {
     }
   }
 
-  if (msg.type === 'save-config') {
-    FIGMA_FILE_KEY = msg.figmaFileKey
-    CNN_MODEL_URL  = msg.cnnModelUrl
-    await figma.clientStorage.setAsync('plugin-config', {
-      figmaFileKey: FIGMA_FILE_KEY,
-      cnnModelUrl:   CNN_MODEL_URL
-    })
-    // notify UI supaya bisa trigger reload (opsional)
-    figma.ui.postMessage({
-      type: 'config-saved',
-      figmaFileKey: FIGMA_FILE_KEY
-    })
-    return
-  }
+  // if (msg.type === 'save-config') {
+  //   FIGMA_FILE_KEY = msg.figmaFileKey
+  //   CNN_MODEL_URL  = msg.cnnModelUrl
+  //   await figma.clientStorage.setAsync('plugin-config', {
+  //     figmaFileKey: FIGMA_FILE_KEY,
+  //     cnnModelUrl:   CNN_MODEL_URL
+  //   })
+  //   // notify UI supaya bisa trigger reload (opsional)
+  //   figma.ui.postMessage({
+  //     type: 'config-saved',
+  //     figmaFileKey: FIGMA_FILE_KEY
+  //   })
+  //   return
+  // }
 
   if (msg.type === "check-components") {
     const newKey = msg.figmaFileKey;
@@ -550,3 +515,6 @@ figma.ui.onmessage = async (msg) => {
     return;
   }
 };
+
+
+

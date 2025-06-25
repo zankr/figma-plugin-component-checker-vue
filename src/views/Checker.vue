@@ -36,7 +36,7 @@
           <h4 class="h4 bold">Design System Component Checker</h4>
           <p class="h7 text-light-dark">Select one frame before check component</p>
           <Button :disabled="!checker.isModelReady" variant="primary" @click="onClickCheck">
-            Check Components
+            {{ checker.isModelReady ? "Check Components" : "Loading Model..." }}
           </Button>
         </div>
         <div class="header-illustration">

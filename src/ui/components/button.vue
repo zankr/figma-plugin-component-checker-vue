@@ -1,13 +1,8 @@
 <template>
   <button
+    v-bind="$attrs"
     class="custom-button"
-    :class="[
-      variantClass,
-      'body',
-      textColorClass,
-      { 'custom-button--block': block }
-    ]"
-    @click="$emit('click')"
+    :class="[ variantClass, 'body', textColorClass, { 'custom-button--block': block } ]"
     :disabled="disabled"
   >
     <slot>Button</slot>
@@ -17,6 +12,7 @@
 <script>
 export default {
   name: 'Button',
+  inheritAttrs: true, // biarkan Vue meneruskan listener & attrs ke elemen <button>
   props: {
     variant: {
       type: String,
@@ -50,7 +46,6 @@ export default {
   border-radius: 5px;
   font-family: inherit;
   cursor: pointer;
-  
   transition: background-color 0.2s ease-in-out;
   width: fit-content; /* hug content secara default */
 }

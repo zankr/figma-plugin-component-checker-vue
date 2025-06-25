@@ -20,7 +20,7 @@
       </div>
     </aside>
 
-    <!-- ISIAN HOME.VUE -->
+    <!-- PLUGIN CONTENT -->
     <div class="plugin-container">
       <div class="login-container">
         <div class="login-form">
@@ -33,14 +33,16 @@
               class="body"
               v-model="store.figmaFileKey"
               type="text"
-              placeholder="" 
+              placeholder=""
             />
             <label class="body-small text-light-dark">
               input figma design system link
             </label>
           </div>
 
-          <!-- <div style="gap: 4px;">
+          <!-- Jika butuh CNN Model, bisa di-uncomment -->
+          <!--
+          <div style="gap: 4px;">
             <label class="body">CNN Model</label>
             <input
               class="body"
@@ -51,7 +53,8 @@
             <label class="body-small text-light-dark">
               input cnn model url
             </label>
-          </div> -->
+          </div>
+          -->
 
           <Button block :disabled="!isFormValid" @click="saveConfig()">
             Save
@@ -66,16 +69,25 @@
       </div>
     </div>
   </div>
+
+<Alert
+  :visible="showAlert"
+  :message="alertMessage"
+  @close="showAlert = false"
+/>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from "../ui/components/Button.vue"
+import Alert from '../ui/components/Modal.vue'  
 import { useConfigStore } from "../code/configStore.js"
 
 const router = useRouter()
 const store = useConfigStore()
+const showAlert = ref(false)
+const alertMessage = ref('')
 
 // Form valid hanya jika kedua field terisi
 const isFormValid = computed(() =>
@@ -97,8 +109,18 @@ function saveConfig() {
     },
     '*'
   )
-  // router.push('/checker')
 }
+
+onMounted(() => {
+  window.onmessage = (event) => {
+    const msg = event.data.pluginMessage
+    if (msg?.type === 'config-saved') {
+      alertMessage.value = 'Figma File Key has been changed'
+      showAlert.value   = true
+    }
+  }
+})
+
 
 function goToHelp() {
   router.push('/help')

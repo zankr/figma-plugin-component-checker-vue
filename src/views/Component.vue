@@ -172,14 +172,19 @@ export default {
     }
 
     const onSearch = () => {}
-    const insertComponent = (key) =>
-      parent.postMessage({ pluginMessage: { type: 'insert-component', key } }, '*')
+    
+    const insertComponent = (key) => {
+        console.log("[UI] send insert-component, key=", key, "at", Date.now());
+        parent.postMessage({ pluginMessage: { type: 'insert-component', key } }, '*');
+      }
+    
     const goToChecker = () => {
       store.setScrollY(window.scrollY)
       window.scrollTo(0, 0)
       window.removeEventListener('message', handleMessage)
       location.href = '#/checker'
     }
+    
     const goToHelp = () => {
       store.setScrollY(window.scrollY)
       location.href = '#/help'

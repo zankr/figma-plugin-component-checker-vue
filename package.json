@@ -1,7 +1,7 @@
 {
-  "name": "figma-plugin-template-vue",
+  "name": "design-system-component-checker",
   "version": "1.0.0",
-  "description": "Your Figma plugin",
+  "description": "Figma plugin",
   "main": "src/code.js",
   "scripts": {
     "start": "concurrently --kill-others -p \"{name}\" -n \"ui  ,code\" -c \"cyan.bold,green.bold\" \"npm run start:ui\" \"npm run start:code\"",

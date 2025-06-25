@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 
 export const useConfigStore = defineStore('configStore', {
   state: () => ({
-    // sekarang namanya figmaFileKey
     figmaFileKey: 'HIHSBFb6tatYWQYl2LudlV',
     cnnModelUrl:  'https://zankr.github.io/figma-ml-model/model.json'
   }),
