@@ -15,15 +15,15 @@ const batchSize      = 20;
 // Fetch satu batch metadata + thumbnail
 async function fetchComponentsBatch(start = 0) {
   if (metaComponents.length === 0 || FIGMA_FILE_KEY !== lastFetchedKey) {
-  lastFetchedKey = FIGMA_FILE_KEY;
-  const res = await fetch(
-    `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`,
-    { headers: { 'X-Figma-Token': FIGMA_ACCESS_TOKEN } }
-  );
-  if (!res.ok) throw new Error('Failed to fetch components metadata');
-  const data = await res.json();
-  metaComponents = Object.values(data.meta.components);
-}
+    lastFetchedKey = FIGMA_FILE_KEY;
+    const res = await fetch(
+      `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`,
+      { headers: { 'X-Figma-Token': FIGMA_ACCESS_TOKEN } }
+    );
+    if (!res.ok) throw new Error('Failed to fetch components metadata');
+    const data = await res.json();
+    metaComponents = Object.values(data.meta.components);
+  }
 
   const total = metaComponents.length;
   const end   = Math.min(start + batchSize, total);
@@ -40,35 +40,54 @@ async function fetchComponentsBatch(start = 0) {
 
   return batch.map(c => ({
     key:           c.key,
-    name:          c.name,
+    // jika dia varian, ambil nama set; kalau bukan, pakai nama asli
+    name:          c.containing_frame?.containingComponentSet?.name || c.name,
     thumbnail_url: imgData.images[c.node_id] || ''
   }));
 }
 
+
 // Master components untuk Checker
 let masterComponents = [];
+
 async function fetchMasterComponents() {
+  // 1) Jangan fetch ulang kalau sudah ada
+  if (masterComponents.length) return;
+
+  // 2) Panggil endpoint /components, bukan /component_sets
   const url = `https://api.figma.com/v1/files/${FIGMA_FILE_KEY}/components`;
-  if (masterComponents.length === 0) {
-    try {
-      const response = await fetch(url, {
-        headers: { "X-Figma-Token": FIGMA_ACCESS_TOKEN }
-      });
-      if (!response.ok) throw new Error("Failed to fetch components");
-      const data = await response.json();
-      masterComponents = Object.values(data.meta.components).map(c => ({
-        key: c.key,
-        name: c.name
-      }));
-      console.log("Fetched master components:", masterComponents);
-    } catch (err) {
-      console.error("Error fetching master components:", err);
-      figma.notify("Error fetching master components. See console.");
-      
-    
-    }
+
+  try {
+    const response = await fetch(url, {
+      headers: { "X-Figma-Token": FIGMA_ACCESS_TOKEN }
+    });
+    if (!response.ok) throw new Error("Failed to fetch components");
+
+    const data = await response.json();
+
+    // 3) Map tiap komponen: kalau ada containing_frame.containingComponentSet
+    masterComponents = Object.values(data.meta.components).map(c => {
+      // optional chaining agar safe kalau beberapa field tidak ada
+      const setName = c.containing_frame
+        ?.containingComponentSet
+        ?.name;
+      return {
+        key:  c.key,
+        name: setName || c.name
+      };
+    });
+
+    console.log("Fetched master components:", masterComponents);
+    figma.ui.postMessage({ type: 'result', components: masterComponents });
+
+  } catch (err) {
+    console.error("Error fetching master components:", err);
+    figma.notify("Error fetching master components. See console.");
   }
 }
+
+
+
 
 // Fungsi untuk memeriksa instance di dalam frame secara rekursif
 async function checkInstancesInFrame(frame) {
@@ -165,18 +184,7 @@ function sendToUi(name, id, imageData, predictedLabel = "") {
 }
 
 // Fungsi pencarian master component berdasarkan label prediksi
-function findMasterComponentByLabel(predictedLabel) {
-  const lowerLabel = predictedLabel.toLowerCase();
-  let result = masterComponents.find(component => 
-    component.name.toLowerCase() === lowerLabel
-  );
-  if (!result) {
-    result = masterComponents.find(component => 
-      component.name.toLowerCase().includes(lowerLabel)
-    );
-  }
-  return result;
-}
+
 
 // Fungsi tambahan: mencari semua kemungkinan varian master component berdasarkan label
 function findMasterComponentsByLabel(predictedLabel) {
@@ -187,31 +195,31 @@ function findMasterComponentsByLabel(predictedLabel) {
 }
 
 // Fungsi untuk mengimpor master component dan menghasilkan preview gambarnya
-async function generateMasterPreview(predictedLabel) {
-  await fetchMasterComponents();
-  const compInfo = findMasterComponentByLabel(predictedLabel);
-  if (!compInfo) {
-    figma.notify(`Master component dengan nama '${predictedLabel}' tidak ditemukan.`);
-    return null;
-  }
-  try {
-    const masterComponent = await figma.importComponentByKeyAsync(compInfo.key);
-    const instance = masterComponent.createInstance();
-    instance.x = -1000;
-    instance.y = -1000;
-    figma.currentPage.appendChild(instance);
-    const imageData = await instance.exportAsync({
-      format: "PNG",
-      constraint: { type: "SCALE", value: 2 }
-    });
-    const base64Data = figma.base64Encode(imageData);
-    instance.remove();
-    return base64Data;
-  } catch (error) {
-    console.error("Error generating master preview:", error);
-    return null;
-  }
-}
+// async function generateMasterPreview(predictedLabel) {
+//   await fetchMasterComponents();
+//   const compInfo = findMasterComponentByLabel(predictedLabel);
+//   if (!compInfo) {
+//     figma.notify(`Master component dengan nama '${predictedLabel}' tidak ditemukan.`);
+//     return null;
+//   }
+//   try {
+//     const masterComponent = await figma.importComponentByKeyAsync(compInfo.key);
+//     const instance = masterComponent.createInstance();
+//     instance.x = -1000;
+//     instance.y = -1000;
+//     figma.currentPage.appendChild(instance);
+//     const imageData = await instance.exportAsync({
+//       format: "PNG",
+//       constraint: { type: "SCALE", value: 2 }
+//     });
+//     const base64Data = figma.base64Encode(imageData);
+//     instance.remove();
+//     return base64Data;
+//   } catch (error) {
+//     console.error("Error generating master preview:", error);
+//     return null;
+//   }
+// }
 
 // Fungsi tambahan untuk generate semua varian preview
 async function generateMasterPreviews(predictedLabel) {

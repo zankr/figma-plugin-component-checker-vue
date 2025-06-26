@@ -61,6 +61,12 @@
           <p class="h5">{{ checker.summary.invalid ?? 0 }}</p>
         </div>
       </div>
+      
+      <div class="divider-with-text">
+        <span class="line"></span>
+        <span class="h7 text-light-dark">🡳 All Invalid Component 🡳</span>
+        <span class="line"></span>
+      </div>
 
       <div class="container-instance">
         <div v-for="(item, idx) in checker.images" :key="idx" class="container">
@@ -97,8 +103,8 @@
                   </Button>
                 </div>
               </div>
-              <div v-else>
-                <p>Memuat varian…</p>
+              <div v-else class="loading-spinner">
+                <!-- <p>Memuat varian…</p> -->
               </div>
             </div>
           </div>
@@ -344,6 +350,33 @@ export default {
 
 
 <style scoped>
+
+.divider-with-text {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
+  margin: 0px;
+  padding: 0px 24px;
+  
+}
+.divider-with-text .line {
+  flex: 1;
+  height: 1px;
+  background: #E8ECF5;
+}
+.loading-spinner {
+  grid-column: 1 / -1;
+  justify-self: center;
+  border: 4px solid rgba(0,0,0,0.1);
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg) }
+}
 
 .tooltip-container {
   position: relative;

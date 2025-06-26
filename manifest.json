@@ -7,7 +7,7 @@
   "main":  "dist/src/code/code.js",
   "ui": "dist/src/ui/src/ui/ui.html",
   "id": "1519557590882551722",
-  "networkAccess": { "allowedDomains": ["https://zankr.github.io/figma-ml-model", "https://fonts.googleapis.com", "https://fonts.gstatic.com"] },
+  "networkAccess": { "allowedDomains": ["https://zankr.github.io", "https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://api.figma.com"] },
   "documentAccess": "dynamic-page"
 }
 
