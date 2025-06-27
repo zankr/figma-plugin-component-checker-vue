@@ -184,7 +184,18 @@ function sendToUi(name, id, imageData, predictedLabel = "") {
 }
 
 // Fungsi pencarian master component berdasarkan label prediksi
-
+// function findMasterComponentByLabel(predictedLabel) {
+//   const lowerLabel = predictedLabel.toLowerCase();
+//   let result = masterComponents.find(component => 
+//     component.name.toLowerCase() === lowerLabel
+//   );
+//   if (!result) {
+//     result = masterComponents.find(component => 
+//       component.name.toLowerCase().includes(lowerLabel)
+//     );
+//   }
+//   return result;
+// }
 
 // Fungsi tambahan: mencari semua kemungkinan varian master component berdasarkan label
 function findMasterComponentsByLabel(predictedLabel) {
