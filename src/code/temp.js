@@ -111,16 +111,15 @@ async function checkInstancesInFrame(frame) {
         if (isValid) {
           result.valid++;
         } else {
-          console.log(`Instance mismatch: ${instance.name} | component key: ${mainComponent.key}`);
+          console.log(`Instance mismatch: ${instance.name}`);
           result.invalid++;
           result.invalidInstances.push(instance);
         }
-      } 
-      // else {
-      //   console.log(`Instance tanpa main component: ${instance.name}`);
-      //   result.invalid++;
-      //   result.invalidInstances.push(instance);
-      // }
+      } else {
+        console.log(`Instance tanpa main component: ${instance.name}`);
+        result.invalid++;
+        result.invalidInstances.push(instance);
+      }
     } catch (error) {
       console.error(`Error processing instance ${instance.name}:`, error);
     }
@@ -185,44 +184,83 @@ function sendToUi(name, id, imageData, predictedLabel = "") {
 }
 
 // Fungsi pencarian master component berdasarkan label prediksi
-// 1) Cari master components matching (return array)
+function findMasterComponentByLabel(predictedLabel) {
+  const lowerLabel = predictedLabel.toLowerCase();
+  let result = masterComponents.find(component => 
+    component.name.toLowerCase() === lowerLabel
+  );
+  if (!result) {
+    result = masterComponents.find(component => 
+      component.name.toLowerCase().includes(lowerLabel)
+    );
+  }
+  return result;
+}
+
+// Fungsi tambahan: mencari semua kemungkinan varian master component berdasarkan label
 function findMasterComponentsByLabel(predictedLabel) {
-  const lower = predictedLabel.toLowerCase();
-  return masterComponents.filter(c =>
-    c.name.toLowerCase().includes(lower)
+  const lowerLabel = predictedLabel.toLowerCase();
+  return masterComponents.filter(component => 
+    component.name.toLowerCase().includes(lowerLabel)
   );
 }
 
-// 2) Generate preview untuk semua hasil pencarian
-async function generateMasterPreviews(predictedLabel) {
-  await fetchMasterComponents();  // pastikan masterComponents sudah terisi
-
-  const comps = findMasterComponentsByLabel(predictedLabel);
-  const previews = [];
-
-  for (const { name, key } of comps) {
-    try {
-      const master = await figma.importComponentByKeyAsync(key);
-      const inst   = master.createInstance();
-      inst.x = inst.y = -9999;
-      figma.currentPage.appendChild(inst);
-
-      const img = await inst.exportAsync({
-        format: 'PNG',
-        constraint: { type: 'SCALE', value: 2 }
-      });
-      const b64 = figma.base64Encode(img);
-
-      previews.push({ name, key, preview: b64 });
-      inst.remove();
-    } catch (e) {
-      console.error(`Error previewing ${name}:`, e);
-    }
+// Fungsi untuk mengimpor master component dan menghasilkan preview gambarnya
+async function generateMasterPreview(predictedLabel) {
+  await fetchMasterComponents();
+  const compInfo = findMasterComponentByLabel(predictedLabel);
+  if (!compInfo) {
+    figma.notify(`Master component dengan nama '${predictedLabel}' tidak ditemukan.`);
+    return null;
   }
-
-  return previews;  // bisa [] | [one] | [many]
+  try {
+    const masterComponent = await figma.importComponentByKeyAsync(compInfo.key);
+    const instance = masterComponent.createInstance();
+    instance.x = -1000;
+    instance.y = -1000;
+    figma.currentPage.appendChild(instance);
+    const imageData = await instance.exportAsync({
+      format: "PNG",
+      constraint: { type: "SCALE", value: 2 }
+    });
+    const base64Data = figma.base64Encode(imageData);
+    instance.remove();
+    return base64Data;
+  } catch (error) {
+    console.error("Error generating master preview:", error);
+    return null;
+  }
 }
 
+// Fungsi tambahan untuk generate semua varian preview
+async function generateMasterPreviews(predictedLabel) {
+  await fetchMasterComponents();
+  const possibleComponents = findMasterComponentsByLabel(predictedLabel);
+  const previews = [];
+  for (const compInfo of possibleComponents) {
+    try {
+      const masterComponent = await figma.importComponentByKeyAsync(compInfo.key);
+      const instance = masterComponent.createInstance();
+      instance.x = -1000;
+      instance.y = -1000;
+      figma.currentPage.appendChild(instance);
+      const imageData = await instance.exportAsync({
+        format: "PNG",
+        constraint: { type: "SCALE", value: 2 }
+      });
+      const base64Data = figma.base64Encode(imageData);
+      previews.push({
+        name: compInfo.name,
+        key: compInfo.key,
+        preview: base64Data
+      });
+      instance.remove();
+    } catch (error) {
+      console.error(`Error generating preview for ${compInfo.name}:`, error);
+    }
+  }
+  return previews;
+}
 
 // Handler untuk pesan dari UI
 figma.ui.onmessage = async (msg) => {
@@ -412,17 +450,25 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg.type === "fetch-master-preview") {
     const { predictedLabel, originalId } = msg;
+    const previews = await generateMasterPreviews(predictedLabel);
 
-    // hanya satu panggilan, lalu kirim array apa adanya
-    const variants = await generateMasterPreviews(predictedLabel);
-
-    figma.ui.postMessage({
-      type: "masterPreview",
-      originalId,
-      variants     // bisa kosong, satu, atau banyak
-    });
+    if (!previews || previews.length === 0) {
+      const previewImage = await generateMasterPreview(predictedLabel);
+      figma.ui.postMessage({ 
+        type: "masterPreview", 
+        originalId, 
+        predictedLabel, 
+        variants: previewImage ? [{ name: predictedLabel, key: "", preview: previewImage }] : [] 
+      });
+    } else {
+      figma.ui.postMessage({ 
+        type: "masterPreview", 
+        originalId, 
+        predictedLabel, 
+        variants: previews 
+      });
+    }
   }
-
 
   if (msg.type === "user-selected-variant") {
     const { key, originalId } = msg;

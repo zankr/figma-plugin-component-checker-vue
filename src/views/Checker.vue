@@ -27,7 +27,6 @@
       </div>
     </aside>
 
-
     <!-- ISI UTAMA -->
     <div class="plugin-container">
       <!-- HEADER -->
@@ -61,7 +60,7 @@
           <p class="h5">{{ checker.summary.invalid ?? 0 }}</p>
         </div>
       </div>
-      
+
       <div class="divider-with-text">
         <span class="line"></span>
         <span class="h7 text-light-dark">🡳 All Invalid Component 🡳</span>
@@ -94,8 +93,14 @@
             </p>
 
             <div class="component-container">
-              <div v-if="item.variants.length">
-                <div v-for="(variant, j) in item.variants" :key="variant.key" class="component-item">
+              <!-- 1. Loading -->
+              <div v-if="item.loadingVariants" class="loading-spinner">
+                <p>Memuat varian…</p>
+              </div>
+
+              <!-- 2. Ada varian -->
+              <div v-else-if="item.variants.length" class="variants-list">
+                <div v-for="variant in item.variants" :key="variant.key" class="component-item">
                   <img :src="variant.previewUrl" alt="Preview" class="thumb" />
                   <p class="body bold" style="display: block; width: 100%; margin: 0;">{{ variant.name }}</p>
                   <Button variant="secondary" @click="insertVariant(variant.key, item.id)">
@@ -103,8 +108,10 @@
                   </Button>
                 </div>
               </div>
-              <div v-else class="loading-spinner">
-                <!-- <p>Memuat varian…</p> -->
+
+              <!-- 3. Kosong setelah loading -->
+              <div v-else class="no-variants">
+                <p>Tidak ada komponen yang sesuai</p>
               </div>
             </div>
           </div>
@@ -137,7 +144,6 @@ export default {
     const classLabels = ref([])
     const fileChanged = ref(false)
     const lastUsedKey = ref("")
-
 
     // ⏳ Load model awal
     const loadModel = async () => {
@@ -176,7 +182,7 @@ export default {
         console.warn("Model belum siap.")
         return
       }
-      
+
       console.log("📤 Sending check-components for:", config.figmaFileKey)
 
       checker.setImages([])
@@ -205,7 +211,8 @@ export default {
         blobUrl,
         predictedLabel: null,
         confidence: null,
-        variants: []
+        variants: [],
+        loadingVariants: true
       })
 
       checker.addImage(newItem)
@@ -247,11 +254,13 @@ export default {
     const handleMasterPreview = (msg) => {
       const idx = checker.images.findIndex(item => item.id === msg.originalId)
       if (idx !== -1) {
-        checker.images[idx].variants = msg.variants.map(v => ({
+        const item = checker.images[idx]
+        item.variants = msg.variants.map(v => ({
           name: v.name,
           key: v.key,
           previewUrl: "data:image/png;base64," + v.preview
         }))
+        item.loadingVariants = false
       }
     }
 
@@ -273,7 +282,6 @@ export default {
       window.parent.postMessage({ pluginMessage: { type: "go-to-component", id } }, "*")
     }
 
-    // 📨 Terima pesan dari plugin
     const handleMessage = (event) => {
       const msg = event.data.pluginMessage
       if (!msg) return
@@ -313,7 +321,6 @@ export default {
 
       lastUsedKey.value = config.figmaFileKey
 
-      // Cek saat mount, apakah fileKey berubah sejak terakhir
       if (checker.lastUsedKey && checker.lastUsedKey !== config.figmaFileKey) {
         console.log("⚠️ figmaFileKey berbeda dari sebelumnya. Harus cek ulang.")
         fileChanged.value = true
@@ -323,7 +330,6 @@ export default {
         checker.setFlags({ dataReceived: false, noInvalid: false })
       }
 
-      // Simpan key untuk next check
       checker.lastUsedKey = config.figmaFileKey
     })
 
@@ -346,6 +352,7 @@ export default {
   }
 }
 </script>
+
 
 
 
